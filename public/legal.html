@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web Summary — Legal &amp; Privacy</title>
+    <meta
+      name="description"
+      content="Privacy policy, terms of use, and permissions for the Web Summary Chrome extension."
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --text: #1e293b;
+        --muted: #64748b;
+        --accent: #4f46e5;
+        --border: #e2e8f0;
+        --amber: #b45309;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        font-size: 15px;
+        line-height: 1.65;
+        color: var(--text);
+        background: var(--bg);
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+      }
+      header {
+        margin-bottom: 2rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.5rem;
+      }
+      .meta {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .lang-bar {
+        display: flex;
+        gap: 0.5rem;
+        margin: 1.25rem 0 1.5rem;
+      }
+      .lang-bar button {
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.4rem 0.85rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+      }
+      .lang-bar button.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      nav.toc {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        margin-bottom: 2rem;
+      }
+      nav.toc p {
+        margin: 0 0 0.5rem;
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      nav.toc ol {
+        margin: 0;
+        padding-left: 1.25rem;
+        font-size: 0.9rem;
+      }
+      nav.toc a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      nav.toc a:hover {
+        text-decoration: underline;
+      }
+      section.card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.25rem;
+      }
+      section.card h2 {
+        font-size: 1.1rem;
+        font-weight: 800;
+        margin: 0 0 0.75rem;
+        padding-top: 0.25rem;
+      }
+      section.card h3 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin: 1.25rem 0 0.5rem;
+      }
+      section.card p,
+      section.card li {
+        margin: 0.5rem 0;
+      }
+      section.card ul {
+        margin: 0.5rem 0;
+        padding-left: 1.25rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+        margin: 0.75rem 0;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 0.5rem 0.65rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f1f5f9;
+        font-weight: 700;
+      }
+      a {
+        color: var(--accent);
+      }
+      .note {
+        font-size: 0.88rem;
+        color: var(--amber);
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 0.5rem;
+        padding: 0.65rem 0.85rem;
+        margin: 0.75rem 0;
+      }
+      .lang-block[hidden] {
+        display: none;
+      }
+      footer {
+        margin-top: 2rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Web Summary</h1>
+        <p class="meta">Legal, privacy &amp; permissions · Last updated: 2026-06-15</p>
+        <div class="lang-bar" role="tablist" aria-label="Language">
+          <button type="button" class="active" data-lang="en" role="tab" aria-selected="true">
+            English
+          </button>
+          <button type="button" data-lang="zh" role="tab" aria-selected="false">中文</button>
+        </div>
+      </header>
+
+      <!-- English -->
+      <div id="lang-en" class="lang-block" lang="en">
+        <nav class="toc" aria-label="Table of contents">
+          <p>Contents</p>
+          <ol>
+            <li><a href="#en-overview">Overview</a></li>
+            <li><a href="#en-privacy">Privacy Policy</a></li>
+            <li><a href="#en-terms">Terms of Use</a></li>
+            <li><a href="#en-third-party">Third-Party Services</a></li>
+            <li><a href="#en-permissions">Permissions</a></li>
+            <li><a href="#en-data-limits">Data &amp; Limits</a></li>
+            <li><a href="#en-contact">Contact</a></li>
+          </ol>
+        </nav>
+
+        <section class="card" id="en-overview">
+          <h2>1. Overview</h2>
+          <p>
+            <strong>Web Summary</strong> (Chrome Web Store name:
+            <strong>A · Web Summary</strong>) is a browser extension that helps you
+            <strong>decide whether to keep reading the active tab</strong>—then summarizes it
+            using <strong>your own</strong> Google Gemini API key (BYOK — bring your own key).
+          </p>
+          <p>
+            There is <strong>no Web Summary backend server</strong>. The extension runs in
+            your browser (side panel) and talks directly to Google’s Gemini API when you choose
+            to summarize.
+          </p>
+          <p>
+            <strong>Single purpose:</strong> help you decide whether to read the current web page
+            tab and summarize it for you.
+          </p>
+        </section>
+
+        <section class="card" id="en-privacy">
+          <h2>2. Privacy Policy</h2>
+
+          <h3>What we do not collect or store</h3>
+          <p>We do <strong>not</strong> collect, log, or store:</p>
+          <ul>
+            <li>Page text or URLs you summarize</li>
+            <li>Generated summaries</li>
+            <li>Usage analytics tied to your browsing</li>
+          </ul>
+
+          <h3>What stays on your device</h3>
+          <p>
+            The only data the extension may persist locally is your <strong>Gemini API key</strong>
+            (if you save it in Settings) and your <strong>side panel UI language</strong>
+            (English or 中文). Both are stored in
+            <code>chrome.storage.local</code> on this browser only.
+          </p>
+
+          <h3>What is sent to third parties</h3>
+          <p>
+            When you tap <strong>Summarize this tab</strong>, article text is sent
+            <strong>directly from your browser</strong> to
+            <strong>Google’s Gemini API</strong> using your API key. We do not receive a copy of
+            that content.
+          </p>
+          <p>
+            That processing is governed by
+            <a href="https://policies.google.com/privacy" rel="noopener noreferrer"
+              >Google’s Privacy Policy</a
+            >
+            and
+            <a href="https://ai.google.dev/gemini-api/terms" rel="noopener noreferrer"
+              >Gemini API terms</a
+            >.
+          </p>
+
+          <h3>Page access</h3>
+          <p>
+            A content script is injected <strong>only when you request a summary</strong> on the
+            active http(s) tab, to extract readable text. It does not stay active on every page
+            for background summarization.
+          </p>
+
+          <h3>Summary results</h3>
+          <p>
+            Results (read/skip verdict, three-line summary, full summary) appear in the side panel
+            only and are <strong>not saved</strong> by the extension. Closing the panel or browser
+            clears them from the UI.
+          </p>
+        </section>
+
+        <section class="card" id="en-terms">
+          <h2>3. Terms of Use</h2>
+          <ul>
+            <li>
+              <strong>Your API key:</strong> You are responsible for obtaining, securing, and
+              managing your Gemini API key. Anyone with your key can use your Google AI quota.
+            </li>
+            <li>
+              <strong>Costs &amp; quota:</strong> Summaries consume your Gemini API usage (free
+              or paid tier per
+              <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer"
+                >Google AI Studio</a
+              >). We do not bill you.
+            </li>
+            <li>
+              <strong>AI output:</strong> Summaries are machine-generated. Verify important
+              facts yourself; do not rely on them for legal, medical, or financial decisions.
+            </li>
+            <li>
+              <strong>Acceptable use:</strong> Use the extension in compliance with Google’s
+              terms and applicable law. Do not submit content you are not allowed to process.
+            </li>
+            <li>
+              <strong>As-is:</strong> The extension is provided without warranties. We may update
+              or discontinue it at any time.
+            </li>
+          </ul>
+          <div class="note">
+            Keep your API key private. Do not share screenshots or recordings while the key is
+            visible in Settings.
+          </div>
+        </section>
+
+        <section class="card" id="en-third-party">
+          <h2>4. Third-Party Services</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Purpose</th>
+                <th>Policy</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Google Gemini API</td>
+                <td>Generate read/skip verdicts and summaries from page text you send</td>
+                <td>
+                  <a href="https://policies.google.com/privacy" rel="noopener noreferrer"
+                    >Google Privacy</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Google AI Studio</td>
+                <td>Where you create and manage your API key (external site)</td>
+                <td>
+                  <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer"
+                    >AI Studio</a
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p>Web Summary is not affiliated with, endorsed by, or sponsored by Google.</p>
+          <p class="note">
+            This extension also includes open-source software. License texts are listed in
+            <a href="./third-party-notices.html">Third-Party Notices</a> (not part of the privacy
+            policy above).
+          </p>
+        </section>
+
+        <section class="card" id="en-permissions">
+          <h2>5. Permissions (Chrome)</h2>
+          <p>The extension requests only what it needs:</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Permission</th>
+                <th>Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>sidePanel</code></td>
+                <td>Show the summarizer UI in Chrome’s side panel</td>
+              </tr>
+              <tr>
+                <td><code>storage</code></td>
+                <td>Save your Gemini API key and UI language locally (optional)</td>
+              </tr>
+              <tr>
+                <td><code>activeTab</code> + <code>scripting</code></td>
+                <td>Run extraction on the active tab when you click Summarize</td>
+              </tr>
+              <tr>
+                <td><code>http://*/*</code>, <code>https://*/*</code></td>
+                <td>
+                  Host access to inject the reader script on the current http(s) tab from the
+                  side panel (required because side-panel clicks do not grant
+                  <code>activeTab</code> alone)
+                </td>
+              </tr>
+              <tr>
+                <td><code>tabs</code></td>
+                <td>Open the setup guide (welcome) and Settings tabs</td>
+              </tr>
+              <tr>
+                <td><code>generativelanguage.googleapis.com</code></td>
+                <td>Call the Gemini API with your key</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Keyboard shortcut (default <kbd>Alt+Shift+S</kbd>): customize at
+            <code>chrome://extensions/shortcuts</code>.
+          </p>
+        </section>
+
+        <section class="card" id="en-data-limits">
+          <h2>6. Data &amp; Limits</h2>
+          <ul>
+            <li>Only <strong>http(s)</strong> pages with enough readable text can be summarized.</li>
+            <li>
+              Long pages: only the first portion of extracted text (about 8,000 characters) is
+              sent to the model; the UI notes when content was truncated.
+            </li>
+            <li>Requires Chrome 114+ (Side Panel API).</li>
+          </ul>
+        </section>
+
+        <section class="card" id="en-contact">
+          <h2>7. Contact</h2>
+          <p>
+            For privacy or policy questions, contact the publisher listed on the
+            <a
+              href="https://chromewebstore.google.com/"
+              rel="noopener noreferrer"
+              >Chrome Web Store</a
+            >
+            listing, or open an issue in the project repository.
+          </p>
+        </section>
+      </div>
+
+      <!-- Chinese -->
+      <div id="lang-zh" class="lang-block" lang="zh-Hans" hidden>
+        <nav class="toc" aria-label="目录">
+          <p>目录</p>
+          <ol>
+            <li><a href="#zh-overview">概述</a></li>
+            <li><a href="#zh-privacy">隐私政策</a></li>
+            <li><a href="#zh-terms">使用条款</a></li>
+            <li><a href="#zh-third-party">第三方服务</a></li>
+            <li><a href="#zh-permissions">权限说明</a></li>
+            <li><a href="#zh-data-limits">数据与限制</a></li>
+            <li><a href="#zh-contact">联系</a></li>
+          </ol>
+        </nav>
+
+        <section class="card" id="zh-overview">
+          <h2>1. 概述</h2>
+          <p>
+            <strong>Web Summary</strong>（Chrome 网上应用店名称：<strong>A · Web Summary</strong
+            >）是一款浏览器扩展，帮助您<strong>判断当前标签是否值得继续阅读</strong>，并使用<strong
+              >您自己的</strong
+            >
+            Google Gemini API 密钥（BYOK）进行摘要。
+          </p>
+          <p>
+            <strong>无 Web Summary 后端服务器</strong>。扩展在浏览器侧边栏运行，仅在您主动摘要时直接向
+            Google Gemini API 发送请求。
+          </p>
+          <p>
+            <strong>单一用途：</strong>帮助用户判断是否阅读当前网页标签，并为其提供摘要。
+          </p>
+        </section>
+
+        <section class="card" id="zh-privacy">
+          <h2>2. 隐私政策</h2>
+
+          <h3>我们不收集或保存的内容</h3>
+          <p>我们<strong>不会</strong>收集、记录或保存：</p>
+          <ul>
+            <li>您摘要的页面正文或 URL</li>
+            <li>生成的摘要结果</li>
+            <li>与浏览行为绑定的使用分析数据</li>
+          </ul>
+
+          <h3>保留在本设备上的数据</h3>
+          <p>
+            扩展可能持久保存的数据：您在设置中保存的 <strong>Gemini API 密钥</strong>，以及侧边栏
+            <strong>界面语言</strong>（English 或 中文）。均存储于本浏览器的
+            <code>chrome.storage.local</code>。
+          </p>
+
+          <h3>发送给第三方的数据</h3>
+          <p>
+            点击<strong>「摘要当前标签」</strong>时，正文从<strong>您的浏览器</strong>直接发送至
+            <strong>Google Gemini API</strong>（使用您的密钥）。我们不会收到该内容的副本。
+          </p>
+          <p>
+            该处理受
+            <a href="https://policies.google.com/privacy" rel="noopener noreferrer"
+              >Google 隐私政策</a
+            >
+            与
+            <a href="https://ai.google.dev/gemini-api/terms" rel="noopener noreferrer"
+              >Gemini API 条款</a
+            >
+            约束。
+          </p>
+
+          <h3>页面访问</h3>
+          <p>
+            仅在您请求摘要时，向当前 http(s) 标签<strong>注入</strong>内容脚本以提取可读正文，不会在后台对所有页面常驻运行。
+          </p>
+
+          <h3>摘要结果</h3>
+          <p>
+            结果（读/跳过判断、三行摘要、全文摘要）仅在侧边栏显示，扩展<strong>不会持久保存</strong>。关闭侧边栏或浏览器后，界面中的结果即消失。
+          </p>
+        </section>
+
+        <section class="card" id="zh-terms">
+          <h2>3. 使用条款</h2>
+          <ul>
+            <li>
+              <strong>API 密钥：</strong>您须自行获取、保管 Gemini API 密钥。持有密钥者可使用您的 Google AI
+              配额。
+            </li>
+            <li>
+              <strong>费用与配额：</strong>摘要消耗您的 Gemini API 用量（免费或付费，见
+              <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer"
+                >Google AI Studio</a
+              >）。我们不会向您收费。
+            </li>
+            <li>
+              <strong>AI 输出：</strong>摘要由机器生成，重要事实请自行核实，勿用于法律、医疗或财务决策。
+            </li>
+            <li>
+              <strong>合规使用：</strong>须遵守 Google 条款及适用法律，勿提交无权处理的内容。
+            </li>
+            <li><strong>按现状提供：</strong>扩展不提供担保，我们可能随时更新或停止服务。</li>
+          </ul>
+          <div class="note">
+            请妥善保管密钥。设置中显示密钥时请勿截图或录屏分享。
+          </div>
+        </section>
+
+        <section class="card" id="zh-third-party">
+          <h2>4. 第三方服务</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>服务</th>
+                <th>用途</th>
+                <th>政策</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Google Gemini API</td>
+                <td>根据您发送的正文生成读/跳过判断与摘要</td>
+                <td>
+                  <a href="https://policies.google.com/privacy" rel="noopener noreferrer"
+                    >Google 隐私</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Google AI Studio</td>
+                <td>创建与管理 API 密钥（外部网站）</td>
+                <td>
+                  <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer"
+                    >AI Studio</a
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p>Web Summary 与 Google 无关联、未获背书或赞助。</p>
+          <p class="note">
+            扩展还包含开源组件。许可证全文见
+            <a href="./third-party-notices.html">第三方开源声明</a>（不属于上文隐私政策）。
+          </p>
+        </section>
+
+        <section class="card" id="zh-permissions">
+          <h2>5. 权限说明（Chrome）</h2>
+          <p>扩展仅申请必要权限：</p>
+          <table>
+            <thead>
+              <tr>
+                <th>权限</th>
+                <th>原因</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>sidePanel</code></td>
+                <td>在 Chrome 侧边栏显示摘要界面</td>
+              </tr>
+              <tr>
+                <td><code>storage</code></td>
+                <td>在本地保存 Gemini API 密钥与界面语言（可选）</td>
+              </tr>
+              <tr>
+                <td><code>activeTab</code> + <code>scripting</code></td>
+                <td>点击「摘要」时在活动标签上运行提取脚本</td>
+              </tr>
+              <tr>
+                <td><code>http://*/*</code>、<code>https://*/*</code></td>
+                <td>
+                  从侧边栏摘要时，向当前 http(s) 标签注入读取脚本（侧边栏点击无法单独获得
+                  <code>activeTab</code> 权限）
+                </td>
+              </tr>
+              <tr>
+                <td><code>tabs</code></td>
+                <td>打开设置指南（欢迎页）与设置页</td>
+              </tr>
+              <tr>
+                <td><code>generativelanguage.googleapis.com</code></td>
+                <td>使用您的密钥调用 Gemini API</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            键盘快捷键（默认 <kbd>Alt+Shift+S</kbd>）：在
+            <code>chrome://extensions/shortcuts</code> 中自定义。
+          </p>
+        </section>
+
+        <section class="card" id="zh-data-limits">
+          <h2>6. 数据与限制</h2>
+          <ul>
+            <li>仅可摘要具有足够可读正文的 <strong>http(s)</strong> 页面。</li>
+            <li>
+              长页面：仅发送提取正文的前段（约 8,000 字符）；界面会提示内容已截断。
+            </li>
+            <li>需要 Chrome 114+（Side Panel API）。</li>
+          </ul>
+        </section>
+
+        <section class="card" id="zh-contact">
+          <h2>7. 联系</h2>
+          <p>
+            隐私或政策相关问题，请通过
+            <a href="https://chromewebstore.google.com/" rel="noopener noreferrer"
+              >Chrome 网上应用店</a
+            >
+            列表中的发布者信息联系，或在项目仓库提交 issue。
+          </p>
+        </section>
+      </div>
+
+      <footer>
+        <p>Web Summary · Chrome Extension · BYOK Gemini</p>
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        var buttons = document.querySelectorAll('.lang-bar button');
+        var en = document.getElementById('lang-en');
+        var zh = document.getElementById('lang-zh');
+        var navLang = (navigator.language || '').toLowerCase();
+        var initial = navLang.startsWith('zh') ? 'zh' : 'en';
+
+        function setLang(lang) {
+          var isZh = lang === 'zh';
+          en.hidden = isZh;
+          zh.hidden = !isZh;
+          buttons.forEach(function (btn) {
+            var active = btn.getAttribute('data-lang') === lang;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+          });
+          document.documentElement.lang = isZh ? 'zh-Hans' : 'en';
+        }
+
+        buttons.forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            setLang(btn.getAttribute('data-lang'));
+          });
+        });
+
+        setLang(initial);
+      })();
+    </script>
+  </body>
+</html>
