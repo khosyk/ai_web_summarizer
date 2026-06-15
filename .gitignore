@@ -6,5 +6,6 @@ package-lock.json
 .DS_Store
 *.log
 .tmp-*
+.pages-deploy/
 .cursor
 .vscode
