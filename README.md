@@ -42,10 +42,12 @@
 
 ## Chrome Web Store
 
-- **한 번 빌드, 두 용도:** `yarn build` → `dist/`에 확장 프로그램 + 공개 페이지가 함께 생성됩니다.
-  - **확장 로드:** `dist/` 전체를 Chrome에 로드 (설치 시 `dist/welcome.html` 자동 오픈)
-  - **CWS Privacy URL:** `dist/legal.html` (+ `dist/third-party-notices.html`, `dist/assets/`, `dist/welcome/` 등)을 GitHub Pages 등 HTTPS에 배포
-  - Welcome·Legal은 같은 `dist/` 루트에 있으므로 **별도 빌드/복사 불필요** — `public/legal.html`만 수정 후 `yarn build`
+- **확장 빌드:** `yarn build` → `dist/` 전체를 Chrome에 로드하거나 CWS zip 제출
+- **Privacy URL (GitHub Pages):** `legal.html` + `third-party-notices.html` **두 파일만** HTTPS 배포
+  - 로컬 준비: `yarn notices && yarn pages:prepare` → `.pages-deploy/`
+  - `main` push 시 [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)가 위 두 파일만 Pages에 배포
+  - **최초 1회:** GitHub repo → Settings → Pages → Source: **GitHub Actions**
+  - CWS Privacy URL 예: `https://khosyk.github.io/ai_web_summarizer/legal.html`
 - Listing copy: `docs/STORE_LISTING.md`
 - Icons: `public/icons/icon-{16,48,128}.png`
 
@@ -74,5 +76,6 @@ Third-party open-source libraries used in the built extension are listed separat
 ## Third-party open source
 
 - **Runtime notices:** `docs/THIRD_PARTY_NOTICES.md` (regenerate with `yarn notices`)
-- **Public page (ships in `dist/`):** `third-party-notices.html` — linked from `legal.html`
+- **Public page (ships in `dist/` for extension bundle):** `third-party-notices.html` — linked from `legal.html`
+- **GitHub Pages:** `.pages-deploy/` after `yarn pages:prepare` (legal + third-party only)
 - **Privacy / data:** Gemini and user data are documented in `public/legal.html`, not in the notices file

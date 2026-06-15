@@ -9,7 +9,8 @@
 		"build": "vite build",
 		"clean": "rm -rf dist",
 		"lint": "tsc --noEmit",
-		"notices": "node scripts/generate-third-party-notices.mjs"
+		"notices": "node scripts/generate-third-party-notices.mjs",
+		"pages:prepare": "node scripts/prepare-pages.mjs"
 	},
 	"dependencies": {
 		"@mozilla/readability": "^0.6.0",
