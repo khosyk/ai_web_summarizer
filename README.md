@@ -55,6 +55,8 @@
 - `yarn dev`는 Vite 개발 서버(예: `localhost:5173`) 실행용이며, 확장 API 테스트 목적이 아닙니다.
 - 실제 동작 검증은 `dist`를 Chrome 확장으로 로드한 상태에서 진행합니다.
 - 단축키: `chrome://extensions/shortcuts`에서 `Alt+Shift+S` (기본) 커스터마이즈
+- **테스트:** `yarn test` (watch) / `yarn test:run` (CI·푸시 전 1회) / `yarn verify` (= lint + test)
+- **푸시 게이트:** Husky `pre-push`가 `yarn verify` 통과 시에만 `git push` 허용
 
 ## 최초 설치·온보딩
 
