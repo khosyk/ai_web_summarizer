@@ -37,7 +37,9 @@ jobs:
         run: yarn notices
 
       - name: Prepare Pages artifact (legal + third-party only)
-        run: yarn pages:prepare
+        run: |
+          mkdir -p .pages-deploy
+          cp public/legal.html public/third-party-notices.html .pages-deploy/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

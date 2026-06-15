@@ -44,8 +44,7 @@
 
 - **확장 빌드:** `yarn build` → `dist/` 전체를 Chrome에 로드하거나 CWS zip 제출
 - **Privacy URL (GitHub Pages):** `legal.html` + `third-party-notices.html` **두 파일만** HTTPS 배포
-  - 로컬 준비: `yarn notices && yarn pages:prepare` → `.pages-deploy/`
-  - `main` push 시 [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)가 위 두 파일만 Pages에 배포
+  - `main` push 시 [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)가 `yarn notices` 후 위 두 파일만 Pages에 배포
   - **최초 1회:** GitHub repo → Settings → Pages → Source: **GitHub Actions**
   - CWS Privacy URL 예: `https://khosyk.github.io/ai_web_summarizer/legal.html`
 - Listing copy: `docs/STORE_LISTING.md`
@@ -77,5 +76,5 @@ Third-party open-source libraries used in the built extension are listed separat
 
 - **Runtime notices:** `docs/THIRD_PARTY_NOTICES.md` (regenerate with `yarn notices`)
 - **Public page (ships in `dist/` for extension bundle):** `third-party-notices.html` — linked from `legal.html`
-- **GitHub Pages:** `.pages-deploy/` after `yarn pages:prepare` (legal + third-party only)
+- **GitHub Pages:** `main` push 시 Actions가 `legal.html` + `third-party-notices.html`만 배포
 - **Privacy / data:** Gemini and user data are documented in `public/legal.html`, not in the notices file
