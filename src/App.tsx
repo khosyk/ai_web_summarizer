@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText,
   ArrowRight,
-  Activity,
   Clock,
   Settings,
 } from 'lucide-react';
@@ -21,8 +20,7 @@ import {
   resolveUserFacingError,
   WebSummaryError,
 } from './userFacingError';
-import { LEGAL_LINK } from './privacyNotice';
-import { extensionIconUrl, openLegalPage } from './openLegalPage';
+import { extensionIconUrl } from './openLegalPage';
 
 function isChromeExtension(): boolean {
   return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
@@ -40,7 +38,6 @@ type UiCopy = {
   statusExtracting: string;
   statusRunning: string;
   statusDone: string;
-  legalLink: string;
   emptyHint: string;
   errTabHttpOnly: string;
   errBodyTooShort: string;
@@ -77,7 +74,6 @@ const TRANSLATIONS: Record<string, UiCopy> = {
     statusExtracting: 'Collecting tab text…',
     statusRunning: 'Summarizing…',
     statusDone: 'Done',
-    legalLink: LEGAL_LINK.English,
     emptyHint: 'Open an article page and tap Summarize',
     errTabHttpOnly: 'Only http(s) pages can be summarized.',
     errBodyTooShort: 'Page text is too short. Try an article-like page.',
@@ -113,7 +109,6 @@ const TRANSLATIONS: Record<string, UiCopy> = {
     statusExtracting: '正在采集标签页正文…',
     statusRunning: '摘要中…',
     statusDone: '完成',
-    legalLink: LEGAL_LINK.Chinese,
     emptyHint: '打开文章页后点击摘要',
     errTabHttpOnly: '仅支持 http(s) 页面。',
     errBodyTooShort: '正文过短，请在类似文章页重试。',
@@ -429,10 +424,9 @@ export default function App() {
 
   const phases = loadingPhasesFor(language);
   const phasedIdx = Math.min(loadingPhaseIdx, phases.length - 1);
-  const footerStatusText = isProcessing ? phases[phasedIdx].line : status;
 
   return (
-    <div className="flex flex-col h-screen bg-[#F8FAFC] text-[#1E293B] font-sans overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#F8FAFC] font-sans text-[#1E293B]">
       <header className="shrink-0 space-y-2.5 border-b border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
@@ -516,7 +510,7 @@ export default function App() {
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30 p-4 custom-scrollbar">
         <div className="space-y-4">
           <AnimatePresence mode="wait">
             {isProcessing && (
@@ -666,23 +660,6 @@ export default function App() {
           </AnimatePresence>
         </div>
       </main>
-
-      <footer className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-white px-3 py-2">
-        <div className="flex min-w-0 items-center gap-1.5 font-mono text-[9px] font-bold text-slate-400">
-          <Activity
-            size={10}
-            className={isProcessing ? 'animate-pulse text-indigo-500' : 'text-slate-400'}
-          />
-          <span className="truncate">{footerStatusText}</span>
-        </div>
-        <button
-          type="button"
-          onClick={openLegalPage}
-          className="shrink-0 text-[9px] font-black text-indigo-600 underline hover:text-indigo-700"
-        >
-          {T.legalLink}
-        </button>
-      </footer>
 
       <ErrorDialog
         isOpen={errorDialog.isOpen}

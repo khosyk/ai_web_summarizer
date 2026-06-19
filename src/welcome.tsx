@@ -2,17 +2,19 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   ArrowRight,
+  HelpCircle,
   KeyRound,
   PanelRight,
   Puzzle,
   Settings,
-  ShieldCheck,
   X,
   ZoomIn,
 } from 'lucide-react';
 import { detectServiceLang } from './detectServiceLang';
 import { LEGAL_LINK, PRIVACY_DETAIL } from './privacyNotice';
 import { openLegalPage } from './openLegalPage';
+import { QnaAccordion } from './components/QnaAccordion';
+import { getQnaCopy, QNA_SECTION_ID } from './qnaContent';
 import './index.css';
 
 const API_KEY_URL = 'https://aistudio.google.com/apikey';
@@ -49,6 +51,10 @@ type WelcomeCopy = {
   step2Image: string;
   step3Title: string;
   step3Desc: string;
+  stepQnaTitle: string;
+  stepQnaDesc: string;
+  qnaFabLabel: string;
+  qnaTooltip: string;
   imageZoomHint: string;
   guideSteps: GuideStep[];
 };
@@ -60,7 +66,7 @@ const TRANSLATIONS: Record<Lang, WelcomeCopy> = {
     welcome: 'Welcome',
     subtitle:
       'Too many tabs? Summarize the current one and get a read or skip verdict, a three-line summary, and a full summary—all from the side panel. Your API key stays in this browser only.',
-    setupLabel: 'Setup · 4 steps',
+    setupLabel: 'Setup · 5 steps',
     panelHero:
       'Start here: open the side panel first — it stays open while you get and save your API key.',
     readSkipHero:
@@ -86,6 +92,11 @@ const TRANSLATIONS: Record<Lang, WelcomeCopy> = {
     step3Title: '4. Summarize any article tab',
     step3Desc:
       'With the side panel open, go to an http(s) article tab and tap Summarize this tab. You will see read or skip, three lines, and a full summary.',
+    stepQnaTitle: '5. Q&A',
+    stepQnaDesc:
+      'Common questions about API keys, free tier limits, privacy, and errors. Tap a question to expand.',
+    qnaFabLabel: 'Scroll to Q&A',
+    qnaTooltip: 'Having trouble?',
     imageZoomHint: 'Click image to enlarge',
     guideSteps: [
       {
@@ -110,7 +121,7 @@ const TRANSLATIONS: Record<Lang, WelcomeCopy> = {
     welcome: '欢迎',
     subtitle:
       '标签太多？在侧边栏摘要当前页，获得「值得读 / 可跳过」判断、三行摘要与全文摘要。API 密钥仅保存在本浏览器。',
-    setupLabel: '设置 · 4 步',
+    setupLabel: '设置 · 5 步',
     panelHero: '从这里开始：先打开侧边栏——获取并保存 API 密钥时可保持侧边栏打开。',
     readSkipHero:
       '设置完成后，在任意文章页点击摘要。扩展会显示「值得读」或「可跳过」（附一句理由），以及三行与全文摘要，便于快速筛选标签。',
@@ -132,6 +143,10 @@ const TRANSLATIONS: Record<Lang, WelcomeCopy> = {
     step3Title: '4. 摘要任意文章标签页',
     step3Desc:
       '保持侧边栏打开，切换到 http(s) 文章页，点击「摘要当前标签」。将看到读/跳过判断、三行摘要与全文摘要。',
+    stepQnaTitle: '5. 常见问题',
+    stepQnaDesc: '关于 API 密钥、免费额度、隐私与报错的常见问题。点击问题展开答案。',
+    qnaFabLabel: '跳转到常见问题',
+    qnaTooltip: '遇到问题？',
     imageZoomHint: '点击图片放大查看',
     guideSteps: [
       {
@@ -296,9 +311,21 @@ function WelcomePage() {
   const [language, setLanguage] = useState<Lang>(detectLang);
   const [lightbox, setLightbox] = useState<LightboxTarget | null>(null);
   const T = TRANSLATIONS[language];
+  const qna = getQnaCopy(language);
+
+  useEffect(() => {
+    if (window.location.hash !== `#${QNA_SECTION_ID}`) return;
+    const el = document.getElementById(QNA_SECTION_ID);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const scrollToQna = () => {
+    const el = document.getElementById(QNA_SECTION_ID);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8 font-sans text-slate-800">
+    <div className="relative min-h-screen bg-slate-50 p-8 pb-28 font-sans text-slate-800">
       {lightbox ? (
         <ImageLightbox target={lightbox} onClose={() => setLightbox(null)} />
       ) : null}
@@ -335,23 +362,6 @@ function WelcomePage() {
           </div>
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[11px] font-medium leading-relaxed text-emerald-900">
             {T.readSkipHero}
-          </div>
-          <div className="flex gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[11px] leading-relaxed text-slate-600">
-            <ShieldCheck
-              size={14}
-              className="mt-0.5 shrink-0 text-emerald-600"
-              aria-hidden
-            />
-            <div className="space-y-2">
-              <p>{PRIVACY_DETAIL[language]}</p>
-              <button
-                type="button"
-                onClick={openLegalPage}
-                className="font-black text-indigo-600 underline hover:text-indigo-700"
-              >
-                {LEGAL_LINK[language]}
-              </button>
-            </div>
           </div>
         </header>
 
@@ -468,9 +478,55 @@ function WelcomePage() {
               <p className="text-xs leading-relaxed text-slate-500">{T.step3Desc}</p>
             </div>
           </li>
+
+          <li
+            id={QNA_SECTION_ID}
+            className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+          >
+            <div className="mb-4 flex gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+                <HelpCircle size={20} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-black text-slate-900">{T.stepQnaTitle}</p>
+                <p className="text-xs leading-relaxed text-slate-500">{T.stepQnaDesc}</p>
+              </div>
+            </div>
+            <QnaAccordion items={qna.items} />
+          </li>
         </ol>
 
         <p className="text-center text-[11px] leading-relaxed text-slate-400">{T.footer}</p>
+
+        <footer className="space-y-2 border-t border-slate-200 pt-6">
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            {PRIVACY_DETAIL[language]}
+          </p>
+          <button
+            type="button"
+            onClick={openLegalPage}
+            className="text-[11px] font-black text-indigo-600 underline hover:text-indigo-700"
+          >
+            {LEGAL_LINK[language]}
+          </button>
+        </footer>
+      </div>
+
+      <div className="pointer-events-none fixed bottom-6 right-6 z-40 flex flex-col items-end gap-1.5">
+        <span
+          className="pointer-events-none whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg"
+          role="tooltip"
+        >
+          {T.qnaTooltip}
+        </span>
+        <button
+          type="button"
+          onClick={scrollToQna}
+          aria-label={T.qnaFabLabel}
+          className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/35 ring-2 ring-white transition hover:bg-indigo-700 active:scale-95"
+        >
+          <HelpCircle size={24} strokeWidth={2.25} aria-hidden />
+        </button>
       </div>
     </div>
   );

@@ -1,82 +1,49 @@
 # Web Summary Extension
 
-현재 탭의 본문을 추출해 Gemini로 요약하고, **읽을지·넘길지(read/skip)** 를 판단해 주는 Chrome Extension(MV3) 프로젝트입니다.
+현재 탭의 본문을 추출해 Gemini로 요약하고, **읽을지·넘길지(read/skip)** 를 판단해 주는 Chrome Extension(MV3)입니다.
 
-## 현재 구조
+**BYOK (Bring Your Own Key):** 사용자가 [Google AI Studio](https://aistudio.google.com/apikey)에서 발급한 Gemini API 키를 Settings에 저장합니다. 본문은 **브라우저에서 Google Gemini API로 직접** 전송되며, 운영자 백엔드 서버는 없습니다.
 
-- 서버 없이 동작하는 확장 프로그램 구조입니다.
-- 사이드 패널에서 실행되며, **Summarize** 클릭 시 활성 탭(`http/https`)에 `content.js`를 주입해 본문을 추출합니다.
-- 추출된 본문은 Gemini API로 전송해 아래 형식으로 응답합니다.
-  - **Read / Skip** — 이 탭을 더 읽을 가치가 있는지(`read`) 넘겨도 되는지(`skip`) + 한 줄 근거
-  - **세 줄 요약** — 핵심만 빠르게 파악
-  - **전체 요약** — 더 깊은 맥락이 필요할 때
-  - **제목** — AI가 작성한 짧은 헤드라인
+## 구조
 
-탭이 많을 때 **「읽을지 말지」** 를 먼저 결정하고, 필요하면 3줄·전문 요약으로 이어가는 흐름을 목표로 합니다.
+```text
+src/              React 사이드패널, background, content script
+public/           manifest, icons, welcome/legal 정적 파일
+vite.config.ts    yarn build 범위 (rollupOptions.input)
+dist/             yarn build 출력 — Chrome / CWS 제출용
+docs/             테스트·스토어 카피 등 문서
+benchmark/        char-limit 벤치마크 메모 (로컬)
+```
 
-## 실행 방법
+## 실행
 
-1. 의존성 설치
-   - `yarn install`
-2. 빌드
-   - `yarn build`
-3. Chrome에서 로드
-   - `chrome://extensions` → 개발자 모드 ON
-   - `dist` 폴더를 "압축해제된 확장 프로그램을 로드합니다"로 추가
+```bash
+yarn install
+yarn build          # → dist/
+```
+
+Chrome → `chrome://extensions` → **`dist`** 폴더 로드
 
 ## API 키 설정
 
-- API 키는 **Chrome 확장 Settings(`options.html`)** 에서 저장합니다. 사이드패널·Welcome의 Settings 버튼 → `chrome.runtime.openOptionsPage()`.
+1. [Google AI Studio](https://aistudio.google.com/apikey) → **Create API key** (새 프로젝트 생성 가능)
+2. 확장 **Settings** (`options.html`)에 키 붙여넣기 → Save
+3. 사이드패널에서 **Summarize this tab**
 
-## 데이터·프라이버시 (제품 문구 기준)
+온보딩: 설치 시 `welcome.html` · 키 없을 때 사이드패널 Setup guide
 
-- 운영자 서버 없음: 브라우징 본문, URL, 생성된 **요약 결과를 수집·저장하지 않음**
-- 로컬 저장: 사용자가 Settings에 저장한 **Gemini API 키** + 사이드패널 **UI 언어 선택** (`chrome.storage.local`)
-- 요약 시 본문은 사용자 브라우저에서 **Google Gemini API**로 직접 전송 (Google 정책 적용)
-- UI 문구: `src/privacyNotice.ts` (Welcome 상세 / 사이드 패널 Legal 링크)
-
-## 탭 본문 추출
-
-- **Summarize** 클릭 시에만 `content.js`를 현재 http(s) 탭에 주입합니다 (`scripting` + `host_permissions: http(s)://*/*`). 모든 페이지에 상주하지 않습니다.
-- 추출 실패(`Receiving end does not exist`)는 최대 3회 재시도 후 새로고침 안내.
+무료 tier quota는 **GCP 프로젝트·모델별**로 다릅니다. AI Studio에서 사용량을 확인하세요.
 
 ## Chrome Web Store
 
-- **확장 빌드:** `yarn build` → `dist/` 전체를 Chrome에 로드하거나 CWS zip 제출
-- **Privacy URL (GitHub Pages):** `legal.html` + `third-party-notices.html` **두 파일만** HTTPS 배포
-  - `main` push 시 [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)가 `yarn notices` 후 위 두 파일만 Pages에 배포
-  - **최초 1회:** GitHub repo → Settings → Pages → Source: **GitHub Actions**
-  - CWS Privacy URL 예: `https://khosyk.github.io/ai_web_summarizer/legal.html`
-- Listing copy: `docs/STORE_LISTING.md`
-- Icons: `public/icons/icon-{16,48,128}.png`
+- 확장 zip: **`dist/`** 전체
+- Privacy URL: `dist/legal.html` (GitHub Pages — `.github/workflows/deploy-pages.yml`)
 
-## 개발 참고
+## 개발
 
-- `yarn dev`는 Vite 개발 서버(예: `localhost:5173`) 실행용이며, 확장 API 테스트 목적이 아닙니다.
-- 실제 동작 검증은 `dist`를 Chrome 확장으로 로드한 상태에서 진행합니다.
-- 단축키: `chrome://extensions/shortcuts`에서 `Alt+Shift+S` (기본) 커스터마이즈
-- **테스트:** `yarn test` (watch) / `yarn test:run` (CI·푸시 전 1회) / `yarn verify` (= lint + test) — 상세: [`docs/TESTING.md`](docs/TESTING.md)
-- **푸시 게이트:** Husky `pre-push`가 `yarn verify` 통과 시에만 `git push` 허용
+- `yarn dev` — Vite dev server (UI만; MV3 전체 검증은 `dist` 로드)
+- `yarn verify` — lint + test ([`docs/TESTING.md`](docs/TESTING.md))
 
-## 최초 설치·온보딩
+## License
 
-- **처음 설치** 시 `welcome.html` 안내 탭만 자동으로 열립니다. (사이드패널은 Chrome 정책상 자동 오픈 불가 — welcome Step 1 또는 툴바 아이콘 클릭)
-- **Welcome (`welcome.html`):** 온보딩 가이드 + **프라이버시·Legal** (키 입력 없음)
-- **Settings (`options.html`):** Gemini API 키 저장 — Chrome `options_ui` / 사이드패널 Settings
-- **사이드패널:** 키 없으면 amber 배너 → Setup guide(welcome) / Settings(options)
-- welcome Step 2–3 스크린샷: `public/welcome/*.png` (4개, README 참고)
-- 업데이트(`onInstalled` `update`) 시 welcome 자동 오픈 없음
-
-## License (source code)
-
-**No license** — this repository’s source code is © the author. All rights reserved.  
-Forking, copying, or redistributing the source without permission is not allowed unless you obtain separate consent.
-
-Third-party open-source libraries used in the built extension are listed separately (see below).
-
-## Third-party open source
-
-- **Runtime notices:** `docs/THIRD_PARTY_NOTICES.md` (regenerate with `yarn notices`)
-- **Public page (ships in `dist/` for extension bundle):** `third-party-notices.html` — linked from `legal.html`
-- **GitHub Pages:** `main` push 시 Actions가 `legal.html` + `third-party-notices.html`만 배포
-- **Privacy / data:** Gemini and user data are documented in `public/legal.html`, not in the notices file
+Source: © author, all rights reserved. Third-party: [`docs/THIRD_PARTY_NOTICES.md`](docs/THIRD_PARTY_NOTICES.md) · `yarn notices`
