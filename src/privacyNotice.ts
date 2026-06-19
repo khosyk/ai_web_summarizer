@@ -14,6 +14,8 @@ export const LEGAL_LINK: Record<ServiceLang, string> = {
   Chinese: '法律与隐私',
 };
 
+export const SUPPORT_EMAIL = 'thisistest20260619@gmail.com';
+
 /** 상세 안내 (Welcome) */
 export const PRIVACY_DETAIL: Record<ServiceLang, string> = {
   English:
