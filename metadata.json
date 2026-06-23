@@ -1,5 +1,5 @@
 {
-  "name": "Web Summary",
+  "name": "A · Web Summary",
   "description": "Chrome side-panel extension (BYOK Gemini) that helps you decide whether to read or skip each tab, with three-line and full summaries. No backend server—text goes from your browser to Google.",
   "requestFramePermissions": [],
   "majorCapabilities": []

@@ -6,25 +6,33 @@ import {
 
 describe('pickSummaryDisplayTitle', () => {
   it('returns English fallback for empty scraped title', () => {
-    expect(pickSummaryDisplayTitle('', false)).toBe('Untitled summary');
+    expect(pickSummaryDisplayTitle('', 'English')).toBe('Untitled summary');
   });
 
   it('returns Chinese fallback when UI is Chinese and title is empty', () => {
-    expect(pickSummaryDisplayTitle('untitled', true)).toBe('无标题摘要');
+    expect(pickSummaryDisplayTitle('untitled', 'Chinese')).toBe('无标题摘要');
+  });
+
+  it('returns Korean fallback for empty title when UI is Korean', () => {
+    expect(pickSummaryDisplayTitle('', 'Korean')).toBe('제목 없음');
   });
 
   it('replaces Korean title with English fallback when UI is English', () => {
-    expect(pickSummaryDisplayTitle('한국어 제목', false)).toBe('Untitled summary');
+    expect(pickSummaryDisplayTitle('한국어 제목', 'English')).toBe('Untitled summary');
   });
 
   it('keeps Latin title when UI is English', () => {
-    expect(pickSummaryDisplayTitle('Export policy update', false)).toBe(
+    expect(pickSummaryDisplayTitle('Export policy update', 'English')).toBe(
       'Export policy update',
     );
   });
 
+  it('keeps Hangul title when UI is Korean', () => {
+    expect(pickSummaryDisplayTitle('한국어 제목', 'Korean')).toBe('한국어 제목');
+  });
+
   it('replaces Hangul title with Chinese fallback when UI is Chinese', () => {
-    expect(pickSummaryDisplayTitle('한국어 제목', true)).toBe('无标题摘要');
+    expect(pickSummaryDisplayTitle('한국어 제목', 'Chinese')).toBe('无标题摘要');
   });
 });
 
@@ -33,7 +41,7 @@ describe('extractGeneratedTitleAndBody', () => {
     const { displayTitle, summaryBody } = extractGeneratedTitleAndBody(
       'TITLE: Custom headline\n\nFirst paragraph.\nSecond line.',
       'Scraped',
-      false,
+      'English',
     );
 
     expect(displayTitle).toBe('Custom headline');
@@ -44,7 +52,7 @@ describe('extractGeneratedTitleAndBody', () => {
     const { displayTitle, summaryBody } = extractGeneratedTitleAndBody(
       'Summary without title prefix.',
       'Scraped headline',
-      false,
+      'English',
     );
 
     expect(displayTitle).toBe('Scraped headline');
@@ -55,7 +63,7 @@ describe('extractGeneratedTitleAndBody', () => {
     const { displayTitle, summaryBody } = extractGeneratedTitleAndBody(
       '',
       '',
-      true,
+      'Chinese',
     );
 
     expect(displayTitle).toBe('无标题摘要');

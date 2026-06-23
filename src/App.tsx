@@ -12,40 +12,31 @@ import { SummaryResultView } from './components/SummaryResultView';
 import { ErrorDialog } from './components/ErrorDialog';
 import { getGeminiApiKey, GEMINI_API_KEY_STORAGE_KEY } from './apiKeyStorage';
 import { detectServiceLang } from './detectServiceLang';
-import { getUiLanguage, setUiLanguage, UI_LANGUAGE_STORAGE_KEY } from './uiLanguageStorage';
+import { getUiLanguage, UI_LANGUAGE_STORAGE_KEY } from './uiLanguageStorage';
 import type { ServiceLang } from './privacyNotice';
 import { summarizeArticle, MAX_INPUT_CHARS } from './geminiClient';
+import {
+  getLanguageNativeLabel,
+  isServiceLang,
+  LANGUAGE_SECTION_ID,
+} from './supportedLanguages';
 import {
   isErrorCode,
   resolveUserFacingError,
   WebSummaryError,
 } from './userFacingError';
 import { extensionIconUrl } from './openLegalPage';
+import { PRODUCT_DISPLAY_NAME } from './productBrand';
 
 function isChromeExtension(): boolean {
   return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
 }
 
-const LANGUAGES = [
-  { id: 'English', label: 'English' },
-  { id: 'Chinese', label: '中文' },
-] as const;
-
 type UiCopy = {
   title: string;
   analyzeBtn: string;
-  statusReady: string;
-  statusExtracting: string;
-  statusRunning: string;
-  statusDone: string;
+  languageChange: string;
   emptyHint: string;
-  errTabHttpOnly: string;
-  errBodyTooShort: string;
-  errExtractFailedFallback: string;
-  errTabCommFallback: string;
-  errTabRefreshRequired: string;
-  errNoApiKey: string;
-  errNotExtension: string;
   errDialogTitle: string;
   errDialogClose: string;
   statsSource: string;
@@ -66,23 +57,31 @@ type UiCopy = {
   copiedSummary: string;
 };
 
+type AppSummaryResult = {
+  sourceTabUrl: string;
+  summaryLanguage: ServiceLang;
+  readRecommendation: 'read' | 'skip';
+  readReason: string;
+  title: string;
+  briefLines: string[];
+  fullSummary: string;
+  wasInputTruncated: boolean;
+  stats: {
+    originalLength: number;
+    model?: string;
+    sentToModelChars?: number;
+    approxInputTokensHint?: number;
+    maxOutputTokensCap?: number;
+    source?: string;
+  };
+};
+
 const TRANSLATIONS: Record<string, UiCopy> = {
   English: {
-    title: 'Web Summary',
+    title: PRODUCT_DISPLAY_NAME,
     analyzeBtn: 'Summarize this tab',
-    statusReady: 'Ready',
-    statusExtracting: 'Collecting tab text…',
-    statusRunning: 'Summarizing…',
-    statusDone: 'Done',
+    languageChange: 'Change language',
     emptyHint: 'Open an article page and tap Summarize',
-    errTabHttpOnly: 'Only http(s) pages can be summarized.',
-    errBodyTooShort: 'Page text is too short. Try an article-like page.',
-    errExtractFailedFallback: 'Could not extract page body.',
-    errTabCommFallback: 'Could not talk to the tab. Refresh the page and try again.',
-    errTabRefreshRequired:
-      'Could not read this tab yet. Refresh the page once, then try again.',
-    errNoApiKey: 'Add your Gemini API key in Settings first.',
-    errNotExtension: 'Load this app as a Chrome extension (build dist/ and reload).',
     errDialogTitle: 'Something went wrong',
     errDialogClose: 'OK',
     statsSource: 'Source',
@@ -102,21 +101,35 @@ const TRANSLATIONS: Record<string, UiCopy> = {
     copySummary: 'Copy',
     copiedSummary: 'Copied',
   },
+  Korean: {
+    title: PRODUCT_DISPLAY_NAME,
+    analyzeBtn: '이 탭 요약하기',
+    languageChange: '언어 변경',
+    emptyHint: '기사 페이지를 연 뒤 요약하기를 누르세요',
+    errDialogTitle: '문제가 발생했습니다',
+    errDialogClose: '확인',
+    statsSource: '출처',
+    statsOutputCap: '출력 상한',
+    statsBodyChars: '본문 길이',
+    statsInputEst: '입력(추정)',
+    statsFromTab: '현재 탭',
+    statsSubtitle: '메타',
+    loadingFromPage: '페이지에서',
+    processing: 'Gemini로 요약 중…',
+    settings: '설정',
+    apiKeyBanner: '설정 필요',
+    apiKeyBannerBtn: '설정',
+    setupGuideBtn: '설정 가이드',
+    setupEmptyHint: '설정 가이드를 열어 계속 진행하세요.',
+    inputTruncatedNote: `긴 페이지 — 앞부분 약 ${MAX_INPUT_CHARS.toLocaleString('en-US')}자만 전송했습니다.`,
+    copySummary: '복사',
+    copiedSummary: '복사됨',
+  },
   Chinese: {
-    title: '网页摘要',
+    title: PRODUCT_DISPLAY_NAME,
     analyzeBtn: '摘要当前标签',
-    statusReady: '就绪',
-    statusExtracting: '正在采集标签页正文…',
-    statusRunning: '摘要中…',
-    statusDone: '完成',
+    languageChange: '更改语言',
     emptyHint: '打开文章页后点击摘要',
-    errTabHttpOnly: '仅支持 http(s) 页面。',
-    errBodyTooShort: '正文过短，请在类似文章页重试。',
-    errExtractFailedFallback: '无法提取页面正文。',
-    errTabCommFallback: '无法与标签页通信，请刷新后重试。',
-    errTabRefreshRequired: '暂时无法读取当前标签，请先刷新页面后重试。',
-    errNoApiKey: '请先在设置中填写 Gemini API 密钥。',
-    errNotExtension: '请以 Chrome 扩展方式加载（构建 dist/ 后重新加载）。',
     errDialogTitle: '出错了',
     errDialogClose: '确定',
     statsSource: '来源',
@@ -159,6 +172,24 @@ const LOADING_PHASE_COPY: Record<string, Array<{ line: string; hint: string }>> 
       hint: 'A good moment for a sip of tea.',
     },
   ],
+  Korean: [
+    {
+      line: '본문 수집 중',
+      hint: '기사형 페이지가 가장 잘 됩니다. 다른 레이아웃은 더 넓은 본문을 사용할 수 있습니다.',
+    },
+    {
+      line: '전송 분량 조정',
+      hint: `앞부분 약 ${String(MAX_INPUT_CHARS)}자까지만 보냅니다.`,
+    },
+    {
+      line: 'Gemini 호출',
+      hint: '저장된 API 키로 Google generativelanguage 엔드포인트를 사용합니다.',
+    },
+    {
+      line: '모델 응답 대기',
+      hint: '잠깐 여유를 가져도 좋습니다.',
+    },
+  ],
   Chinese: [
     {
       line: '采集正文',
@@ -181,6 +212,12 @@ const LOADING_PHASE_COPY: Record<string, Array<{ line: string; hint: string }>> 
 
 function loadingPhasesFor(lang: string) {
   return LOADING_PHASE_COPY[lang] ?? LOADING_PHASE_COPY.English;
+}
+
+function bodyCharUnit(language: ServiceLang): string {
+  if (language === 'Chinese') return ' 字';
+  if (language === 'Korean') return '자';
+  return ' chars';
 }
 
 type ExtractPageDataResponse = {
@@ -210,28 +247,53 @@ async function injectContentScript(tabId: number): Promise<void> {
   });
 }
 
+/** 탭 본문 추출 — content.js가 있으면 재주입하지 않음 */
+async function extractPageDataFromTab(
+  tabId: number,
+): Promise<ExtractPageDataResponse> {
+  let contentScriptInjected = false;
+  let lastExtractError: unknown = null;
+
+  for (let attempt = 0; attempt < TAB_EXTRACT_MAX_RETRY; attempt++) {
+    try {
+      return (await chrome.tabs.sendMessage(tabId, {
+        action: 'EXTRACT_PAGE_DATA',
+      })) as ExtractPageDataResponse;
+    } catch (sendErr: unknown) {
+      lastExtractError = sendErr;
+      if (isReceivingEndMissingError(sendErr) && !contentScriptInjected) {
+        await injectContentScript(tabId);
+        contentScriptInjected = true;
+        await sleepMs(220);
+        continue;
+      }
+      if (attempt < TAB_EXTRACT_MAX_RETRY - 1) {
+        await sleepMs(220);
+      }
+    }
+  }
+
+  if (lastExtractError) {
+    if (isReceivingEndMissingError(lastExtractError)) {
+      throw new WebSummaryError('E04', 'receiving_end_missing');
+    }
+    throw new WebSummaryError(
+      'E07',
+      lastExtractError instanceof Error
+        ? lastExtractError.message
+        : String(lastExtractError),
+    );
+  }
+
+  throw new WebSummaryError('E05', 'extract_no_response');
+}
+
 export default function App() {
-  const [status, setStatus] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [language, setLanguageState] = useState<ServiceLang>(() => detectServiceLang());
   const [displayUrl, setDisplayUrl] = useState('');
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
-  const [result, setResult] = useState<{
-    readRecommendation: 'read' | 'skip';
-    readReason: string;
-    title: string;
-    briefLines: string[];
-    fullSummary: string;
-    wasInputTruncated: boolean;
-    stats: {
-      originalLength: number;
-      model?: string;
-      sentToModelChars?: number;
-      approxInputTokensHint?: number;
-      maxOutputTokensCap?: number;
-      source?: string;
-    };
-  } | null>(null);
+  const [result, setResult] = useState<AppSummaryResult | null>(null);
 
   const [loadingPhaseIdx, setLoadingPhaseIdx] = useState(0);
   const [loadingSnippets, setLoadingSnippets] = useState<string[]>([]);
@@ -241,11 +303,6 @@ export default function App() {
   }>({ isOpen: false, message: '' });
 
   const T = getT(language);
-
-  const setLanguage = (next: ServiceLang) => {
-    setLanguageState(next);
-    void setUiLanguage(next);
-  };
 
   useEffect(() => {
     void getUiLanguage().then(setLanguageState);
@@ -269,7 +326,7 @@ export default function App() {
       }
       if (UI_LANGUAGE_STORAGE_KEY in changes) {
         const next = changes[UI_LANGUAGE_STORAGE_KEY].newValue;
-        if (next === 'English' || next === 'Chinese') {
+        if (isServiceLang(next)) {
           setLanguageState(next);
         }
       }
@@ -286,17 +343,17 @@ export default function App() {
   };
 
   const openWelcomeGuide = () => {
+    const hash = `#${LANGUAGE_SECTION_ID}`;
     if (isChromeExtension() && chrome.runtime.getURL) {
-      void chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') });
+      void chrome.tabs.create({ url: chrome.runtime.getURL(`welcome.html${hash}`) });
       return;
     }
-    window.open('/welcome.html', '_blank', 'noopener,noreferrer');
+    window.open(`/welcome.html${hash}`, '_blank', 'noopener,noreferrer');
   };
 
   const showError = (error: unknown) => {
     const { message, logDetail } = resolveUserFacingError(error, language);
     console.error('[Web Summary]', logDetail);
-    setStatus(T.statusReady);
     setErrorDialog({ isOpen: true, message });
   };
 
@@ -316,12 +373,6 @@ export default function App() {
     };
   }, [isProcessing]);
 
-  useEffect(() => {
-    if (!isProcessing) {
-      setStatus(T.statusReady);
-    }
-  }, [language, isProcessing, T.statusReady]);
-
   const handleStartAnalysis = async () => {
     if (isProcessing) return;
 
@@ -338,58 +389,38 @@ export default function App() {
     }
     setHasApiKey(true);
 
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    const tabUrl = tab?.url ?? '';
+    if (!tab?.id || !tabUrl.startsWith('http')) {
+      showError(new WebSummaryError('E03'));
+      return;
+    }
+
+    if (
+      result &&
+      result.sourceTabUrl === tabUrl &&
+      result.summaryLanguage === language
+    ) {
+      return;
+    }
+
     setLoadingSnippets([]);
     setIsProcessing(true);
     setResult(null);
-    setStatus(T.statusExtracting);
 
     try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      const tabUrl = tab?.url ?? '';
-      if (!tab?.id || !tabUrl.startsWith('http')) {
-        throw new WebSummaryError('E03');
-      }
-
       setDisplayUrl(tabUrl);
 
-      await injectContentScript(tab.id);
+      const data = await extractPageDataFromTab(tab.id);
 
-      let data: ExtractPageDataResponse | undefined;
-      let lastExtractError: unknown = null;
-      for (let attempt = 0; attempt < TAB_EXTRACT_MAX_RETRY; attempt++) {
-        try {
-          data = (await chrome.tabs.sendMessage(tab.id, {
-            action: 'EXTRACT_PAGE_DATA',
-          })) as ExtractPageDataResponse | undefined;
-          break;
-        } catch (sendErr: unknown) {
-          lastExtractError = sendErr;
-          if (attempt < TAB_EXTRACT_MAX_RETRY - 1) {
-            await sleepMs(220);
-          }
-        }
-      }
-
-      if (!data && lastExtractError) {
-        if (isReceivingEndMissingError(lastExtractError)) {
-          throw new WebSummaryError('E04', 'receiving_end_missing');
-        }
-        throw new WebSummaryError(
-          'E07',
-          lastExtractError instanceof Error
-            ? lastExtractError.message
-            : String(lastExtractError),
-        );
-      }
-
-      if (!data || data.errorCode || data.error) {
-        if (data?.errorCode && isErrorCode(data.errorCode)) {
+      if (data.errorCode || data.error) {
+        if (data.errorCode && isErrorCode(data.errorCode)) {
           throw new WebSummaryError(data.errorCode, data.error);
         }
-        throw new WebSummaryError('E05', data?.error);
+        throw new WebSummaryError('E05', data.error);
       }
 
       const raw = (data.articleText ?? data.textContent ?? '').trim();
@@ -403,7 +434,6 @@ export default function App() {
         extractLoadingSnippets(articleText, data.title),
       );
       setDisplayUrl(data.url || tabUrl);
-      setStatus(T.statusRunning);
 
       const summary = await summarizeArticle({
         apiKey,
@@ -412,8 +442,12 @@ export default function App() {
         articleText,
       });
 
-      setResult({ ...summary, wasInputTruncated });
-      setStatus(T.statusDone);
+      setResult({
+        ...summary,
+        wasInputTruncated,
+        sourceTabUrl: tabUrl,
+        summaryLanguage: language,
+      });
     } catch (e: unknown) {
       showError(e);
     } finally {
@@ -442,27 +476,15 @@ export default function App() {
             </h1>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            <div
-              role="group"
-              aria-label="Output language"
-              className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5"
+            <button
+              type="button"
+              onClick={openWelcomeGuide}
+              className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[9px] font-black text-slate-600 hover:border-indigo-300 hover:text-indigo-600"
+              title={T.languageChange}
+              aria-label={T.languageChange}
             >
-              {LANGUAGES.map((lang) => (
-                <button
-                  key={lang.id}
-                  type="button"
-                  onClick={() => setLanguage(lang.id)}
-                  aria-pressed={language === lang.id}
-                  className={`rounded-md px-2 py-1 text-[9px] font-black transition-all ${
-                    language === lang.id
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {lang.label}
-                </button>
-              ))}
-            </div>
+              {getLanguageNativeLabel(language)}
+            </button>
             <button
               type="button"
               onClick={openSettings}
@@ -636,7 +658,7 @@ export default function App() {
                         {T.statsBodyChars}:{' '}
                         <strong className="text-emerald-400">
                           {result.stats?.sentToModelChars ?? result.stats?.originalLength}
-                          {language === 'Chinese' ? ' 字' : ' chars'}
+                          {bodyCharUnit(language)}
                         </strong>
                       </span>
                       <span className="text-slate-400">

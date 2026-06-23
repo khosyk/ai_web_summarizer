@@ -4,6 +4,7 @@ import {
   langTag,
 } from './summaryPrompt';
 import { pickSummaryDisplayTitle } from './summaryParse';
+import type { ServiceLang } from './privacyNotice';
 import {
   GEMINI_SUMMARY_RESPONSE_SCHEMA,
   parseStructuredSummary,
@@ -175,13 +176,12 @@ export type SummaryResult = {
 /** 탭에서 추출한 본문을 Gemini로 요약 */
 export async function summarizeArticle(input: {
   apiKey: string;
-  language: string;
+  language: ServiceLang;
   articleTitle?: string;
   articleText: string;
 }): Promise<SummaryResult> {
   const { apiKey, language, articleTitle, articleText } = input;
   const L = langTag(language);
-  const langIsZh = L === 'zh';
 
   const normalized = normalizeIncomingArticle(articleText).slice(
     0,
@@ -189,7 +189,7 @@ export async function summarizeArticle(input: {
   );
   const scrapedTitle = pickSummaryDisplayTitle(
     articleTitle?.trim() || '',
-    langIsZh,
+    language,
   );
 
   const userPrompt = buildLeanPrompt({
@@ -215,7 +215,7 @@ export async function summarizeArticle(input: {
       const parsed = parseStructuredSummary(
         result.text,
         scrapedTitle,
-        langIsZh,
+        language,
       );
 
       return {

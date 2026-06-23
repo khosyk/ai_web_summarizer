@@ -74,6 +74,14 @@ const COPY: Record<
 		verdictLabel: "Read?",
 		headline: "Headline",
 	},
+	Korean: {
+		brief: "세 줄 요약",
+		full: "전체 요약",
+		verdictRead: "읽을 가치 있음",
+		verdictSkip: "지금은 건너뛰기",
+		verdictLabel: "읽을까?",
+		headline: "제목",
+	},
 	Chinese: {
 		brief: "三行摘要",
 		full: "全文摘要",

@@ -1,4 +1,5 @@
 import { pickSummaryDisplayTitle } from './summaryParse';
+import type { ServiceLang } from './privacyNotice';
 import { WebSummaryError } from './userFacingError';
 
 export type ReadRecommendation = 'read' | 'skip';
@@ -71,7 +72,7 @@ function normalizeRawJsonPayload(raw: string): string {
 export function parseStructuredSummary(
   raw: string,
   scrapedTitle: string,
-  langIsZh: boolean,
+  outputLanguage: ServiceLang,
 ): StructuredSummary {
   let parsed: unknown;
   try {
@@ -113,7 +114,7 @@ export function parseStructuredSummary(
     throw new WebSummaryError('E10', 'full_summary');
   }
 
-  const title = titleRaw || pickSummaryDisplayTitle(scrapedTitle, langIsZh);
+  const title = titleRaw || pickSummaryDisplayTitle(scrapedTitle, outputLanguage);
 
   return {
     readRecommendation,

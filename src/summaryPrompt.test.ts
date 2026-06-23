@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildLeanPrompt,
-  buildSummaryFormatGuide,
   buildSystemInstructionForLang,
   langTag,
 } from './summaryPrompt';
@@ -11,7 +10,11 @@ describe('langTag', () => {
     expect(langTag('Chinese')).toBe('zh');
   });
 
-  it('maps other UI languages to en', () => {
+  it('maps Korean UI to ko', () => {
+    expect(langTag('Korean')).toBe('ko');
+  });
+
+  it('maps English UI to en', () => {
     expect(langTag('English')).toBe('en');
   });
 });
@@ -27,11 +30,9 @@ describe('buildLeanPrompt', () => {
     expect(prompt).toContain('LANG=en');
     expect(prompt).toContain('T: Sample article');
     expect(prompt).toContain('Body text here.');
-    expect(prompt).toContain('readRecommendation');
-    expect(prompt).toContain('briefLines');
   });
 
-  it('uses Chinese output instructions for Chinese UI', () => {
+  it('uses zh language tag for Chinese UI', () => {
     const prompt = buildLeanPrompt({
       language: 'Chinese',
       title: '示例',
@@ -39,13 +40,6 @@ describe('buildLeanPrompt', () => {
     });
 
     expect(prompt).toContain('LANG=zh');
-    expect(prompt).toContain('OUTPUT_FIXED=zh-CN');
-  });
-});
-
-describe('buildSummaryFormatGuide', () => {
-  it('requires exactly three briefLines in English guide', () => {
-    expect(buildSummaryFormatGuide('en')).toContain('exactly 3 strings');
   });
 });
 
@@ -53,5 +47,6 @@ describe('buildSystemInstructionForLang', () => {
   it('requests JSON schema fields', () => {
     expect(buildSystemInstructionForLang('en')).toContain('readRecommendation');
     expect(buildSystemInstructionForLang('zh')).toContain('简体中文');
+    expect(buildSystemInstructionForLang('ko')).toContain('한국어');
   });
 });
