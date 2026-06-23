@@ -66,6 +66,59 @@ const QNA: Record<string, QnaCopy> = {
       },
     ],
   },
+  Korean: {
+    title: '자주 묻는 질문',
+    items: [
+      {
+        id: 'api-key',
+        question: 'Gemini API 키가 필요한가요?',
+        answer:
+          '네. Web Summary는 BYOK(자체 키) 방식입니다. Google AI Studio에서 무료 키를 만든 뒤 설정에 붙여넣으세요. 요약은 브라우저에서 사용자 키로 Google에 직접 요청합니다.',
+      },
+      {
+        id: 'create-key',
+        question: '키는 어떻게 만들나요? Google Cloud를 알아야 하나요?',
+        answer:
+          'Google AI Studio → API Key → Create API key를 여세요. Create new project를 선택할 수 있으며 Cloud Console 수동 설정은 필요 없습니다. 전체 키를 확장 설정에 붙여넣고 저장하세요.',
+      },
+      {
+        id: 'free-tier',
+        question: 'API가 무료인가요? 일일 한도가 있나요?',
+        answer:
+          'Google은 프로젝트별 무료 한도(분당/일일 요청)를 제공하며 모델마다 다릅니다. 이 확장은 gemini-2.5-flash-lite를 우선 사용합니다. 한도 오류가 나면 AI Studio에서 사용량을 확인하세요.',
+      },
+      {
+        id: 'privacy',
+        question: '어떤 데이터가 저장되나요?',
+        answer:
+          'Web Summary 백엔드 서버는 없습니다. API 키(저장 시)와 UI 언어는 이 기기의 chrome.storage.local에만 있습니다. 요약은 저장되지 않고 사이드패널에만 표시됩니다.',
+      },
+      {
+        id: 'pages',
+        question: '어떤 페이지를 요약할 수 있나요?',
+        answer:
+          'http(s) 기사형 페이지가 가장 잘 됩니다. 요약 시 필요하면 스크립트를 주입해 본문을 추출합니다. 실패하면 페이지를 한 번 새로고침한 뒤 다시 시도하세요.',
+      },
+      {
+        id: 'read-skip',
+        question: '읽기/건너뛰기는 무슨 뜻인가요?',
+        answer:
+          '읽기: 세 줄로는 부족해 탭을 열어 둬야 합니다. 건너뛰기: 세 줄로 판단 가능해 닫아도 됩니다. 모델이 기사를 보고 한 줄 이유와 함께 선택합니다.',
+      },
+      {
+        id: 'errors',
+        question: '요청이 너무 많거나 키가 invalid인가요?',
+        answer:
+          'invalid 키(E11): 설정에서 수정하세요. 요청 과다(E12): 잠시 후 재시도하거나 AI Studio 할당량을 확인하세요. 그 외: 다른 기사 페이지에서 다시 Summarize해 보세요.',
+      },
+      {
+        id: 'contact',
+        question: '더 궁금한 점이 있나요?',
+        answer: '이메일:',
+        email: SUPPORT_EMAIL,
+      },
+    ],
+  },
   Chinese: {
     title: '常见问题',
     items: [

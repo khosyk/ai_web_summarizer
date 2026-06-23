@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 
 const FALLBACK_EN = "Scanning headings and key lines from the page…";
+const FALLBACK_KO = "페이지 제목과 핵심 문장을 스캔하는 중…";
 const FALLBACK_ZH = "正在扫描页面标题与关键句…";
+
+function fallbackPhrase(language: string): string {
+	if (language === "Chinese") return FALLBACK_ZH;
+	if (language === "Korean") return FALLBACK_KO;
+	return FALLBACK_EN;
+}
 
 type Props = {
 	snippets: string[];
@@ -18,7 +25,7 @@ export function LoadingSnippetTypewriter({
 	const phrases =
 		snippets.length > 0
 			? snippets
-			: [language === "Chinese" ? FALLBACK_ZH : FALLBACK_EN];
+			: [fallbackPhrase(language)];
 
 	const [phraseIdx, setPhraseIdx] = useState(0);
 	const [charIdx, setCharIdx] = useState(0);

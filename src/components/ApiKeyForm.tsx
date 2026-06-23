@@ -28,6 +28,18 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     errEmpty: 'Enter your Gemini API key.',
     saved: 'Saved. You can close this tab.',
   },
+  Korean: {
+    keyPrivateLead: '키를 안전하게 보관하세요.',
+    keyPrivateBody:
+      '이 키를 가진 사람은 Gemini 할당량을 사용할 수 있습니다. 신뢰하는 기기에서만 표시하세요.',
+    keyLabel: 'Gemini API 키',
+    keySaved: '키가 저장됨 — 아래에서 수정할 수 있습니다.',
+    saveBtn: '저장',
+    showKey: 'API 키 표시',
+    hideKey: 'API 키 숨기기',
+    errEmpty: 'Gemini API 키를 입력하세요.',
+    saved: '저장되었습니다. 이 탭을 닫아도 됩니다.',
+  },
   Chinese: {
     keyPrivateLead: '请妥善保管密钥。',
     keyPrivateBody: '持有此密钥的人可使用您的 Gemini 配额。仅在可信设备上使用「显示」。',

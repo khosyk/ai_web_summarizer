@@ -15,7 +15,7 @@ describe('parseStructuredSummary', () => {
     const result = parseStructuredSummary(
       JSON.stringify(validPayload),
       'Scraped title',
-      false,
+      'English',
     );
 
     expect(result.readRecommendation).toBe('read');
@@ -27,7 +27,7 @@ describe('parseStructuredSummary', () => {
 
   it('strips markdown code fences before parsing', () => {
     const wrapped = `\`\`\`json\n${JSON.stringify(validPayload)}\n\`\`\``;
-    const result = parseStructuredSummary(wrapped, 'Title', false);
+    const result = parseStructuredSummary(wrapped, 'Title', 'English');
     expect(result.readRecommendation).toBe('read');
   });
 
@@ -35,7 +35,7 @@ describe('parseStructuredSummary', () => {
     const result = parseStructuredSummary(
       JSON.stringify({ ...validPayload, readRecommendation: 'skip' }),
       'Title',
-      false,
+      'English',
     );
     expect(result.readRecommendation).toBe('skip');
   });
@@ -44,7 +44,7 @@ describe('parseStructuredSummary', () => {
     const result = parseStructuredSummary(
       JSON.stringify({ ...validPayload, readRecommendation: 'maybe' }),
       'Title',
-      false,
+      'English',
     );
     expect(result.readRecommendation).toBe('read');
   });
@@ -53,17 +53,17 @@ describe('parseStructuredSummary', () => {
     const result = parseStructuredSummary(
       JSON.stringify({ ...validPayload, title: '   ' }),
       'Article headline',
-      false,
+      'English',
     );
     expect(result.title).toBe('Article headline');
   });
 
   it('throws E10 for invalid JSON', () => {
-    expect(() => parseStructuredSummary('not json', 'Title', false)).toThrow(
+    expect(() => parseStructuredSummary('not json', 'Title', 'English')).toThrow(
       WebSummaryError,
     );
     try {
-      parseStructuredSummary('not json', 'Title', false);
+      parseStructuredSummary('not json', 'Title', 'English');
     } catch (error) {
       expect(error).toMatchObject({ code: 'E10' });
     }
@@ -74,7 +74,7 @@ describe('parseStructuredSummary', () => {
       parseStructuredSummary(
         JSON.stringify({ ...validPayload, briefLines: ['one', 'two'] }),
         'Title',
-        false,
+        'English',
       ),
     ).toThrow(WebSummaryError);
   });
@@ -84,7 +84,7 @@ describe('parseStructuredSummary', () => {
       parseStructuredSummary(
         JSON.stringify({ ...validPayload, readReason: '' }),
         'Title',
-        false,
+        'English',
       ),
     ).toThrow(WebSummaryError);
   });

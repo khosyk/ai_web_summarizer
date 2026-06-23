@@ -1,8 +1,11 @@
-import { StrictMode, useState } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ApiKeyForm } from './components/ApiKeyForm';
 import { detectServiceLang } from './detectServiceLang';
 import type { ServiceLang } from './privacyNotice';
+import { getUiLanguage, UI_LANGUAGE_STORAGE_KEY } from './uiLanguageStorage';
+import { isServiceLang } from './supportedLanguages';
+import { PRODUCT_DISPLAY_NAME } from './productBrand';
 import './index.css';
 
 const API_KEY_URL = 'https://aistudio.google.com/apikey';
@@ -19,6 +22,11 @@ const TRANSLATIONS: Record<ServiceLang, OptionsCopy> = {
     footerBeforeLink: 'Get a key at ',
     footerAfterLink: '. Summaries use your quota on the free or paid tier.',
   },
+  Korean: {
+    subtitle: 'Gemini API 키는 이 브라우저에만 로컬로 저장됩니다.',
+    footerBeforeLink: '',
+    footerAfterLink: `에서 키를 받으세요. 요약은 무료/유료 할당량을 사용합니다.`,
+  },
   Chinese: {
     subtitle: 'Gemini API 密钥仅保存在本浏览器。',
     footerBeforeLink: '在 ',
@@ -31,28 +39,31 @@ function OptionsPage() {
   const [language, setLanguage] = useState<ServiceLang>(detectServiceLang);
   const T = TRANSLATIONS[language];
 
+  useEffect(() => {
+    void getUiLanguage().then(setLanguage);
+
+    if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) return;
+
+    const onStorageChanged = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      areaName: string,
+    ) => {
+      if (areaName !== 'local') return;
+      if (UI_LANGUAGE_STORAGE_KEY in changes) {
+        const next = changes[UI_LANGUAGE_STORAGE_KEY].newValue;
+        if (isServiceLang(next)) setLanguage(next);
+      }
+    };
+
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    return () => chrome.storage.onChanged.removeListener(onStorageChanged);
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-sans text-slate-800">
       <div className="mx-auto max-w-lg space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex gap-1.5">
-          {(['English', 'Chinese'] as const).map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              onClick={() => setLanguage(lang)}
-              className={`rounded-lg border px-3 py-1.5 text-[10px] font-bold transition-all ${
-                language === lang
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
-                  : 'border-slate-200 bg-white text-slate-400'
-              }`}
-            >
-              {lang === 'Chinese' ? '中文' : 'English'}
-            </button>
-          ))}
-        </div>
-
         <div>
-          <h1 className="text-xl font-black text-slate-900">Web Summary</h1>
+          <h1 className="text-xl font-black text-slate-900">{PRODUCT_DISPLAY_NAME}</h1>
           <p className="mt-1 text-sm text-slate-500">{T.subtitle}</p>
         </div>
 
