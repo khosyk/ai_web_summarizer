@@ -14,6 +14,8 @@ type Props = {
 	snippets: string[];
 	language: string;
 	label: string;
+	/** 모델 대기 중 스니펫 순환·타이핑 속도 상향 */
+	cycleFast?: boolean;
 };
 
 /** 추출 스니펫을 한 글자씩 타이핑하며 순환 표시 */
@@ -21,6 +23,7 @@ export function LoadingSnippetTypewriter({
 	snippets,
 	language,
 	label,
+	cycleFast = false,
 }: Props) {
 	const phrases =
 		snippets.length > 0
@@ -41,16 +44,21 @@ export function LoadingSnippetTypewriter({
 
 	useEffect(() => {
 		if (charIdx < current.length) {
-			const delay = /[\s,.!?。，、]/.test(current.charAt(charIdx)) ? 18 : 32;
+			const punctDelay = cycleFast ? 10 : 18;
+			const charDelay = cycleFast ? 18 : 32;
+			const delay = /[\s,.!?。，、]/.test(current.charAt(charIdx))
+				? punctDelay
+				: charDelay;
 			const t = window.setTimeout(() => setCharIdx((c) => c + 1), delay);
 			return () => window.clearTimeout(t);
 		}
+		const pauseMs = cycleFast ? 550 : 1400;
 		const t = window.setTimeout(() => {
 			setPhraseIdx((i) => (i + 1) % phrases.length);
 			setCharIdx(0);
-		}, 1400);
+		}, pauseMs);
 		return () => window.clearTimeout(t);
-	}, [charIdx, current, phrases.length]);
+	}, [charIdx, current, phrases.length, cycleFast]);
 
 	return (
 		<div className="mt-1 rounded-xl border border-indigo-100/90 bg-slate-50/90 px-3.5 py-3 text-left shadow-inner">

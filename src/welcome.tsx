@@ -5,23 +5,17 @@ import {
 	HelpCircle,
 	KeyRound,
 	PanelRight,
-	Puzzle,
 	Settings,
 	X,
 	ZoomIn,
 } from "lucide-react";
-import { LanguagePicker } from "./components/LanguagePicker";
 import { detectServiceLang } from "./detectServiceLang";
 import { LEGAL_LINK, PRIVACY_DETAIL, type ServiceLang } from "./privacyNotice";
 import { openLegalPage } from "./openLegalPage";
 import { QnaAccordion } from "./components/QnaAccordion";
 import { getQnaCopy, QNA_SECTION_ID } from "./qnaContent";
-import {
-	getUiLanguage,
-	setUiLanguage,
-	UI_LANGUAGE_STORAGE_KEY,
-} from "./uiLanguageStorage";
-import { isServiceLang, LANGUAGE_SECTION_ID } from "./supportedLanguages";
+import { getUiLanguage, UI_LANGUAGE_STORAGE_KEY } from "./uiLanguageStorage";
+import { isServiceLang } from "./supportedLanguages";
 import { PRODUCT_DISPLAY_NAME } from "./productBrand";
 import "./index.css";
 
@@ -34,7 +28,6 @@ type GuideStep = {
 };
 
 type WelcomeCopy = {
-	languageLabel: string;
 	welcome: string;
 	subtitleHook: string;
 	subtitleSetup: string;
@@ -45,9 +38,6 @@ type WelcomeCopy = {
 	step0Title: string;
 	step0Desc: string;
 	step0Btn: string;
-	step0Pin1: string;
-	step0Pin2: string;
-	step0Pin3: string;
 	step1Title: string;
 	step1Desc: string;
 	step1Btn: string;
@@ -70,7 +60,6 @@ type LightboxTarget = { src: string; alt: string };
 
 const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 	English: {
-		languageLabel: "Language",
 		welcome: "Welcome",
 		subtitleHook: "Too many tabs—not sure what to read first?",
 		subtitleSetup:
@@ -82,12 +71,8 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 			"You can close this tab after setup. Reopen Settings anytime from the side panel.",
 		step0Title: "1. Open the side panel",
 		step0Desc:
-			"Web Summary runs in Chrome’s side panel, not in this tab. Pin the extension, then open the panel.",
+			"Web Summary runs in Chrome’s side panel, not in this tab. Tap the button below to open it.",
 		step0Btn: "Open side panel now",
-		step0Pin1: "Click the puzzle icon (Extensions) in the toolbar.",
-		step0Pin2: `Pin “${PRODUCT_DISPLAY_NAME}” — it is first in the A–Z list.`,
-		step0Pin3:
-			"Click the pinned icon to open the side panel (or use the button above).",
 		step1Title: "2. Get a Gemini API key",
 		step1Desc: "Create a free key at Google AI Studio.",
 		step1Btn: "Open API key page →",
@@ -128,7 +113,6 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		],
 	},
 	Korean: {
-		languageLabel: "언어",
 		welcome: "환영합니다",
 		subtitleHook: "탭이 너무 많아 무엇부터 읽어야 할지 모르겠나요?",
 		subtitleSetup: "사이드패널을 열고 Gemini API 키를 한 번만 설정하세요.",
@@ -140,11 +124,8 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 			"설정 후 이 탭을 닫아도 됩니다. 사이드패널에서 언제든 설정을 다시 열 수 있습니다.",
 		step0Title: "1. 사이드패널 열기",
 		step0Desc:
-			"Web Summary는 이 탭이 아니라 Chrome 사이드패널에서 실행됩니다. 확장을 고정한 뒤 패널을 여세요.",
+			"Web Summary는 이 탭이 아니라 Chrome 사이드패널에서 실행됩니다. 아래 버튼으로 여세요.",
 		step0Btn: "지금 사이드패널 열기",
-		step0Pin1: "도구 모음의 퍼즐 아이콘(확장 프로그램)을 클릭하세요.",
-		step0Pin2: `「${PRODUCT_DISPLAY_NAME}」을 고정하세요 — A–Z 목록에서 맨 위입니다.`,
-		step0Pin3: "고정한 아이콘을 클릭해 사이드패널을 열거나(또는 위 버튼 사용).",
 		step1Title: "2. Gemini API 키 받기",
 		step1Desc: "Google AI Studio에서 무료 키를 만드세요.",
 		step1Btn: "API 키 페이지 열기 →",
@@ -184,7 +165,6 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		],
 	},
 	Chinese: {
-		languageLabel: "语言",
 		welcome: "欢迎",
 		subtitleHook: "标签太多，不知道该先读哪一篇？",
 		subtitleSetup: "打开侧边栏，只需设置一次 Gemini API 密钥。",
@@ -194,11 +174,8 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		footer: "设置完成后可关闭此标签。随时可从侧边栏打开设置。",
 		step0Title: "1. 打开侧边栏",
 		step0Desc:
-			"Web Summary 在 Chrome 侧边栏运行，而非本标签页。请先固定扩展，再打开侧边栏。",
+			"Web Summary 在 Chrome 侧边栏运行，而非本标签页。点击下方按钮打开。",
 		step0Btn: "立即打开侧边栏",
-		step0Pin1: "点击工具栏中的拼图图标（扩展程序）。",
-		step0Pin2: `固定「${PRODUCT_DISPLAY_NAME}」——在 A–Z 列表中排在最前。`,
-		step0Pin3: "点击固定后的图标打开侧边栏（或使用上方按钮）。",
 		step1Title: "2. 获取 Gemini API 密钥",
 		step1Desc: "在 Google AI Studio 创建免费密钥。",
 		step1Btn: "打开 API 密钥页面 →",
@@ -406,16 +383,19 @@ function WelcomePage() {
 	}, []);
 
 	useEffect(() => {
-		const hash = window.location.hash.slice(1);
-		if (hash !== QNA_SECTION_ID && hash !== LANGUAGE_SECTION_ID) return;
-		const el = document.getElementById(hash);
-		el?.scrollIntoView({ behavior: "smooth", block: "start" });
-	}, []);
+		const scrollToHash = (hash: string) => {
+			if (hash !== QNA_SECTION_ID) return;
+			document
+				.getElementById(hash)
+				?.scrollIntoView({ behavior: "smooth", block: "start" });
+		};
 
-	const handleLanguageChange = (next: ServiceLang) => {
-		setLanguage(next);
-		void setUiLanguage(next);
-	};
+		scrollToHash(window.location.hash.slice(1));
+
+		const onHashChange = () => scrollToHash(window.location.hash.slice(1));
+		window.addEventListener("hashchange", onHashChange);
+		return () => window.removeEventListener("hashchange", onHashChange);
+	}, []);
 
 	const scrollToQna = () => {
 		const el = document.getElementById(QNA_SECTION_ID);
@@ -429,13 +409,6 @@ function WelcomePage() {
 			) : null}
 			<div className="mx-auto max-w-2xl space-y-8">
 				<header className="space-y-3">
-					<section id={LANGUAGE_SECTION_ID} className="scroll-mt-6 max-w-xs">
-						<LanguagePicker
-							value={language}
-							onChange={handleLanguageChange}
-							label={T.languageLabel}
-						/>
-					</section>
 					<p className="text-xs font-black uppercase tracking-widest text-indigo-600">
 						{T.welcome}
 					</p>
@@ -463,7 +436,7 @@ function WelcomePage() {
 
 				<ol className="space-y-6">
 					<li className="rounded-2xl border-2 border-indigo-300 bg-white p-5 shadow-md shadow-indigo-100">
-						<div className="mb-4 flex gap-4">
+						<div className="flex gap-4">
 							<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
 								<PanelRight size={20} />
 							</div>
@@ -484,28 +457,6 @@ function WelcomePage() {
 								</button>
 							</div>
 						</div>
-						<ol className="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 text-[11px] leading-relaxed text-slate-700">
-							<li className="flex gap-2">
-								<Puzzle
-									size={14}
-									className="mt-0.5 shrink-0 text-indigo-600"
-									aria-hidden
-								/>
-								<span>{T.step0Pin1}</span>
-							</li>
-							<li className="flex gap-2">
-								<span className="font-black text-indigo-600">A</span>
-								<span>{T.step0Pin2}</span>
-							</li>
-							<li className="flex gap-2">
-								<PanelRight
-									size={14}
-									className="mt-0.5 shrink-0 text-indigo-600"
-									aria-hidden
-								/>
-								<span>{T.step0Pin3}</span>
-							</li>
-						</ol>
 					</li>
 
 					<li className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

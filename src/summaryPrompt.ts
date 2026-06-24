@@ -1,25 +1,33 @@
-/** UI 언어 → 프롬프트 LANG 태그 */
+/** UI 언어 → 출력 언어 코드 */
 export function langTag(language: string): string {
   if (language === 'Chinese') return 'zh';
   if (language === 'Korean') return 'ko';
   return 'en';
 }
 
-/** Gemini 시스템 지시 — 스키마·언어·read/skip 규칙 (user 프롬프트와 중복 없음) */
-export function buildSystemInstructionForLang(L: string): string {
-  const schema =
-    'JSON only: readRecommendation (read|skip), readReason, title, briefLines[3], fullSummary. New title. Bold **numbers**.';
+const OUTPUT_LANG_LABEL: Record<string, string> = {
+  en: 'English',
+  ko: 'Korean',
+  zh: 'Simplified Chinese',
+};
 
-  if (L === 'zh') {
-    return `${schema} 全部简体中文。read=三行不够需读原文; skip=三行足够可关标签。briefLines 恰好 3 句。`;
-  }
-  if (L === 'ko') {
-    return `${schema} 전체 한국어. read=세 줄 부족·본문 필요; skip=세 줄로 충분·탭 닫기 가능. briefLines 정확히 3문장.`;
-  }
-  return `${schema} All English. Translate source if needed. read=need article; skip=3 lines enough. briefLines exactly 3.`;
+function outputLanguageClause(L: string): string {
+  const label = OUTPUT_LANG_LABEL[L] ?? OUTPUT_LANG_LABEL.en;
+  return `Write every JSON text field in ${label}. Translate the source article if needed.`;
 }
 
-/** 기사 본문만 전달 — 지시는 systemInstruction + responseSchema에 위임 */
+/** Gemini 시스템 지시 — 영문 고정, 출력 언어만 L에 따라 지정 */
+export function buildSystemInstructionForLang(L: string): string {
+  const schema =
+    'Return JSON only: readRecommendation (read|skip), readReason, title, briefLines (exactly 3 strings), fullSummary. Write a new title; do not echo the scraped title. Bold key **numbers** with Markdown in briefLines and fullSummary.';
+
+  const readSkip =
+    'read: three lines are not enough; the user should read the article or full summary. skip: three lines are enough to decide; safe to close the tab. If unsure, choose read. readReason must be one concrete sentence.';
+
+  return `${schema} ${readSkip} ${outputLanguageClause(L)}`;
+}
+
+/** 기사 본문 user 프롬프트 — 라벨은 영문, OUTPUT_LANG으로 출력 언어 지정 */
 export function buildLeanPrompt(params: {
   language: string;
   title: string;
@@ -28,5 +36,5 @@ export function buildLeanPrompt(params: {
   const L = langTag(params.language);
   const title = params.title.trim().slice(0, 120);
 
-  return `LANG=${L}\nT: ${title}\n---\n${params.content}\n---`;
+  return `OUTPUT_LANG=${L}\nTITLE: ${title}\n---\n${params.content}\n---`;
 }

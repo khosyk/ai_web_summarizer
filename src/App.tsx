@@ -10,16 +10,13 @@ import { extractLoadingSnippets } from './extractLoadingSnippets';
 import { LoadingSnippetTypewriter } from './components/LoadingSnippetTypewriter';
 import { SummaryResultView } from './components/SummaryResultView';
 import { ErrorDialog } from './components/ErrorDialog';
+import { LanguagePicker } from './components/LanguagePicker';
 import { getGeminiApiKey, GEMINI_API_KEY_STORAGE_KEY } from './apiKeyStorage';
 import { detectServiceLang } from './detectServiceLang';
-import { getUiLanguage, UI_LANGUAGE_STORAGE_KEY } from './uiLanguageStorage';
+import { getUiLanguage, setUiLanguage, UI_LANGUAGE_STORAGE_KEY } from './uiLanguageStorage';
 import type { ServiceLang } from './privacyNotice';
 import { summarizeArticle, MAX_INPUT_CHARS } from './geminiClient';
-import {
-  getLanguageNativeLabel,
-  isServiceLang,
-  LANGUAGE_SECTION_ID,
-} from './supportedLanguages';
+import { isServiceLang } from './supportedLanguages';
 import {
   isErrorCode,
   resolveUserFacingError,
@@ -214,6 +211,33 @@ function loadingPhasesFor(lang: string) {
   return LOADING_PHASE_COPY[lang] ?? LOADING_PHASE_COPY.English;
 }
 
+const LOADING_WAIT_HINTS: Record<ServiceLang, string[]> = {
+  English: [
+    'Still waiting on the model…',
+    'Long articles can take a few more seconds.',
+    'Trying another model if the first one is busy.',
+    'Packaging read/skip, three lines, and full summary.',
+    'Your API key is calling Google from this browser.',
+    'Almost there—hang tight.',
+  ],
+  Korean: [
+    '모델 응답을 기다리는 중…',
+    '긴 기사는 조금 더 걸릴 수 있어요.',
+    '첫 모델이 바쁘면 다른 모델로 재시도합니다.',
+    '읽기/건너뛰기·세 줄·전체 요약을 정리하고 있어요.',
+    '브라우저에서 Google API로 직접 요청 중입니다.',
+    '곧 완료됩니다. 잠시만 기다려 주세요.',
+  ],
+  Chinese: [
+    '仍在等待模型返回…',
+    '较长文章可能需要多几秒。',
+    '若首个模型繁忙会尝试其他模型。',
+    '正在整理读/跳过、三行与全文摘要。',
+    '正在通过浏览器用您的密钥请求 Google。',
+    '即将完成，请稍候。',
+  ],
+};
+
 function bodyCharUnit(language: ServiceLang): string {
   if (language === 'Chinese') return ' 字';
   if (language === 'Korean') return '자';
@@ -296,6 +320,7 @@ export default function App() {
   const [result, setResult] = useState<AppSummaryResult | null>(null);
 
   const [loadingPhaseIdx, setLoadingPhaseIdx] = useState(0);
+  const [waitingHintIdx, setWaitingHintIdx] = useState(0);
   const [loadingSnippets, setLoadingSnippets] = useState<string[]>([]);
   const [errorDialog, setErrorDialog] = useState<{
     isOpen: boolean;
@@ -343,12 +368,16 @@ export default function App() {
   };
 
   const openWelcomeGuide = () => {
-    const hash = `#${LANGUAGE_SECTION_ID}`;
     if (isChromeExtension() && chrome.runtime.getURL) {
-      void chrome.tabs.create({ url: chrome.runtime.getURL(`welcome.html${hash}`) });
+      void chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') });
       return;
     }
-    window.open(`/welcome.html${hash}`, '_blank', 'noopener,noreferrer');
+    window.open('/welcome.html', '_blank', 'noopener,noreferrer');
+  };
+
+  const handleLanguageChange = (next: ServiceLang) => {
+    setLanguageState(next);
+    void setUiLanguage(next);
   };
 
   const showError = (error: unknown) => {
@@ -360,9 +389,11 @@ export default function App() {
   useEffect(() => {
     if (!isProcessing) {
       setLoadingPhaseIdx(0);
+      setWaitingHintIdx(0);
       return;
     }
     setLoadingPhaseIdx(0);
+    setWaitingHintIdx(0);
     const t1 = window.setTimeout(() => setLoadingPhaseIdx(1), 450);
     const t2 = window.setTimeout(() => setLoadingPhaseIdx(2), 2200);
     const t3 = window.setTimeout(() => setLoadingPhaseIdx(3), 4800);
@@ -372,6 +403,21 @@ export default function App() {
       window.clearTimeout(t3);
     };
   }, [isProcessing]);
+
+  const phases = loadingPhasesFor(language);
+  const phasedIdx = Math.min(loadingPhaseIdx, phases.length - 1);
+  const isWaitingOnModel = isProcessing && phasedIdx === phases.length - 1;
+  const waitingHints = LOADING_WAIT_HINTS[language];
+  const activeWaitingHint =
+    waitingHints[waitingHintIdx % waitingHints.length] ?? phases[phasedIdx].hint;
+
+  useEffect(() => {
+    if (!isWaitingOnModel) return;
+    const interval = window.setInterval(() => {
+      setWaitingHintIdx((idx) => idx + 1);
+    }, 2200);
+    return () => window.clearInterval(interval);
+  }, [isWaitingOnModel, language]);
 
   const handleStartAnalysis = async () => {
     if (isProcessing) return;
@@ -456,9 +502,6 @@ export default function App() {
     }
   };
 
-  const phases = loadingPhasesFor(language);
-  const phasedIdx = Math.min(loadingPhaseIdx, phases.length - 1);
-
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#F8FAFC] font-sans text-[#1E293B]">
       <header className="shrink-0 space-y-2.5 border-b border-slate-200 bg-white p-3 shadow-sm">
@@ -476,15 +519,13 @@ export default function App() {
             </h1>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={openWelcomeGuide}
-              className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[9px] font-black text-slate-600 hover:border-indigo-300 hover:text-indigo-600"
-              title={T.languageChange}
-              aria-label={T.languageChange}
-            >
-              {getLanguageNativeLabel(language)}
-            </button>
+            <LanguagePicker
+              value={language}
+              onChange={handleLanguageChange}
+              label={T.languageChange}
+              id="panel-ui-language"
+              className="w-[5.75rem] shrink-0 [&>span]:sr-only [&_select]:border-slate-200 [&_select]:px-1.5 [&_select]:py-1 [&_select]:text-[9px] [&_select]:font-black"
+            />
             <button
               type="button"
               onClick={openSettings}
@@ -577,7 +618,7 @@ export default function App() {
 
                   <AnimatePresence mode="wait">
                     <motion.div
-                      key={phasedIdx}
+                      key={isWaitingOnModel ? `wait-${waitingHintIdx}` : phasedIdx}
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -6 }}
@@ -588,7 +629,7 @@ export default function App() {
                         {phases[phasedIdx].line}
                       </p>
                       <p className="mt-2 px-2 text-[10px] font-medium leading-relaxed text-slate-600">
-                        {phases[phasedIdx].hint}
+                        {isWaitingOnModel ? activeWaitingHint : phases[phasedIdx].hint}
                       </p>
                       <p className="mt-2 truncate font-mono text-[9px] text-indigo-300/95">
                         {displayUrl}
@@ -600,6 +641,7 @@ export default function App() {
                     snippets={loadingSnippets}
                     language={language}
                     label={T.loadingFromPage}
+                    cycleFast={isWaitingOnModel}
                   />
                 </div>
               </motion.div>
