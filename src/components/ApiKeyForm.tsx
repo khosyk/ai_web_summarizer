@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { getGeminiApiKey, setGeminiApiKey } from '../apiKeyStorage';
 import type { ServiceLang } from '../privacyNotice';
 
+const API_KEY_URL = 'https://aistudio.google.com/apikey';
+
 type FormCopy = {
+  getKeyPrompt: string;
+  getKeyBtn: string;
+  getKeyNote: string;
   keyPrivateLead: string;
   keyPrivateBody: string;
   keyLabel: string;
@@ -17,6 +22,9 @@ type FormCopy = {
 
 const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
   English: {
+    getKeyPrompt: "Don't have a Gemini API key yet?",
+    getKeyBtn: 'Get a key at Google AI Studio',
+    getKeyNote: 'Summaries use your quota on the free or paid tier.',
     keyPrivateLead: 'Keep your key private.',
     keyPrivateBody:
       'Anyone with this key can use your Gemini quota. Use Show only on a trusted device.',
@@ -29,6 +37,9 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     saved: 'Saved. You can close this tab.',
   },
   Korean: {
+    getKeyPrompt: '아직 Gemini API 키가 없나요?',
+    getKeyBtn: 'Google AI Studio에서 키 받기',
+    getKeyNote: '요약은 무료/유료 할당량을 사용합니다.',
     keyPrivateLead: '키를 안전하게 보관하세요.',
     keyPrivateBody:
       '이 키를 가진 사람은 Gemini 할당량을 사용할 수 있습니다. 신뢰하는 기기에서만 표시하세요.',
@@ -41,6 +52,9 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     saved: '저장되었습니다. 이 탭을 닫아도 됩니다.',
   },
   Chinese: {
+    getKeyPrompt: '还没有 Gemini API 密钥？',
+    getKeyBtn: '在 Google AI Studio 获取密钥',
+    getKeyNote: '摘要将消耗免费或付费配额。',
     keyPrivateLead: '请妥善保管密钥。',
     keyPrivateBody: '持有此密钥的人可使用您的 Gemini 配额。仅在可信设备上使用「显示」。',
     keyLabel: 'Gemini API 密钥',
@@ -87,6 +101,20 @@ export function ApiKeyForm({ language }: Props) {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-white to-white px-4 py-3.5 shadow-sm">
+        <p className="text-sm font-black text-slate-900">{T.getKeyPrompt}</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">{T.getKeyNote}</p>
+        <a
+          href={API_KEY_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-black text-white hover:bg-indigo-700"
+        >
+          {T.getKeyBtn}
+          <ArrowRight size={14} />
+        </a>
+      </div>
+
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-900">
         <strong className="font-black">{T.keyPrivateLead}</strong> {T.keyPrivateBody}
       </div>

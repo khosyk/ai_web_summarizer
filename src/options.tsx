@@ -8,29 +8,19 @@ import { isServiceLang } from './supportedLanguages';
 import { PRODUCT_DISPLAY_NAME } from './productBrand';
 import './index.css';
 
-const API_KEY_URL = 'https://aistudio.google.com/apikey';
-
 type OptionsCopy = {
   subtitle: string;
-  footerBeforeLink: string;
-  footerAfterLink: string;
 };
 
 const TRANSLATIONS: Record<ServiceLang, OptionsCopy> = {
   English: {
     subtitle: 'Your Gemini API key is stored locally in this browser only.',
-    footerBeforeLink: 'Get a key at ',
-    footerAfterLink: '. Summaries use your quota on the free or paid tier.',
   },
   Korean: {
     subtitle: 'Gemini API 키는 이 브라우저에만 로컬로 저장됩니다.',
-    footerBeforeLink: '',
-    footerAfterLink: `에서 키를 받으세요. 요약은 무료/유료 할당량을 사용합니다.`,
   },
   Chinese: {
     subtitle: 'Gemini API 密钥仅保存在本浏览器。',
-    footerBeforeLink: '在 ',
-    footerAfterLink: ' 获取密钥。摘要将消耗免费或付费配额。',
   },
 };
 
@@ -68,19 +58,6 @@ function OptionsPage() {
         </div>
 
         <ApiKeyForm language={language} />
-
-        <p className="text-[11px] leading-relaxed text-slate-400">
-          {T.footerBeforeLink}
-          <a
-            href={API_KEY_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="text-indigo-600 underline"
-          >
-            Google AI Studio
-          </a>
-          {T.footerAfterLink}
-        </p>
       </div>
     </div>
   );

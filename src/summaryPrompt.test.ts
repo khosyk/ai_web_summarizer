@@ -20,33 +20,46 @@ describe('langTag', () => {
 });
 
 describe('buildLeanPrompt', () => {
-  it('includes language tag, title, and article content', () => {
+  it('uses English labels with output language code and article content', () => {
     const prompt = buildLeanPrompt({
       language: 'English',
       title: 'Sample article',
       content: 'Body text here.',
     });
 
-    expect(prompt).toContain('LANG=en');
-    expect(prompt).toContain('T: Sample article');
+    expect(prompt).toContain('OUTPUT_LANG=en');
+    expect(prompt).toContain('TITLE: Sample article');
     expect(prompt).toContain('Body text here.');
+    expect(prompt).not.toMatch(/한국어|简体中文/);
   });
 
-  it('uses zh language tag for Chinese UI', () => {
+  it('sets OUTPUT_LANG=zh for Chinese UI without non-English prompt labels', () => {
     const prompt = buildLeanPrompt({
       language: 'Chinese',
       title: '示例',
       content: '正文',
     });
 
-    expect(prompt).toContain('LANG=zh');
+    expect(prompt).toContain('OUTPUT_LANG=zh');
+    expect(prompt).toContain('TITLE: 示例');
+    expect(prompt).not.toMatch(/한국어|简体中文/);
   });
 });
 
 describe('buildSystemInstructionForLang', () => {
-  it('requests JSON schema fields', () => {
-    expect(buildSystemInstructionForLang('en')).toContain('readRecommendation');
-    expect(buildSystemInstructionForLang('zh')).toContain('简体中文');
-    expect(buildSystemInstructionForLang('ko')).toContain('한국어');
+  it('keeps instructions in English for all output languages', () => {
+    for (const L of ['en', 'ko', 'zh'] as const) {
+      const instruction = buildSystemInstructionForLang(L);
+      expect(instruction).toContain('readRecommendation');
+      expect(instruction).not.toMatch(/한국어|简体中文|全部/);
+    }
+  });
+
+  it('requests Korean output when L is ko', () => {
+    expect(buildSystemInstructionForLang('ko')).toContain('Korean');
+  });
+
+  it('requests Simplified Chinese output when L is zh', () => {
+    expect(buildSystemInstructionForLang('zh')).toContain('Simplified Chinese');
   });
 });
