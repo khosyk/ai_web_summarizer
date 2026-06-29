@@ -5,10 +5,23 @@ import type { ServiceLang } from '../privacyNotice';
 
 const API_KEY_URL = 'https://aistudio.google.com/apikey';
 
+function openWelcomeGuide() {
+  if (
+    typeof chrome !== 'undefined' &&
+    chrome.runtime?.getURL &&
+    chrome.tabs?.create
+  ) {
+    void chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') });
+    return;
+  }
+  window.open('/welcome.html', '_blank', 'noopener,noreferrer');
+}
+
 type FormCopy = {
   getKeyPrompt: string;
   getKeyBtn: string;
   getKeyNote: string;
+  keyWherePrompt: string;
   keyPrivateLead: string;
   keyPrivateBody: string;
   keyLabel: string;
@@ -25,6 +38,7 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     getKeyPrompt: "Don't have a Gemini API key yet?",
     getKeyBtn: 'Get a key at Google AI Studio',
     getKeyNote: 'Summaries use your quota on the free or paid tier.',
+    keyWherePrompt: 'Need help finding your key?',
     keyPrivateLead: 'Keep your key private.',
     keyPrivateBody:
       'Anyone with this key can use your Gemini quota. Use Show only on a trusted device.',
@@ -40,6 +54,7 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     getKeyPrompt: '아직 Gemini API 키가 없나요?',
     getKeyBtn: 'Google AI Studio에서 키 받기',
     getKeyNote: '요약은 무료/유료 할당량을 사용합니다.',
+    keyWherePrompt: '키를 찾는 데 도움이 필요하신가요?',
     keyPrivateLead: '키를 안전하게 보관하세요.',
     keyPrivateBody:
       '이 키를 가진 사람은 Gemini 할당량을 사용할 수 있습니다. 신뢰하는 기기에서만 표시하세요.',
@@ -55,6 +70,7 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     getKeyPrompt: '还没有 Gemini API 密钥？',
     getKeyBtn: '在 Google AI Studio 获取密钥',
     getKeyNote: '摘要将消耗免费或付费配额。',
+    keyWherePrompt: '需要帮助查找密钥吗？',
     keyPrivateLead: '请妥善保管密钥。',
     keyPrivateBody: '持有此密钥的人可使用您的 Gemini 配额。仅在可信设备上使用「显示」。',
     keyLabel: 'Gemini API 密钥',
@@ -114,6 +130,14 @@ export function ApiKeyForm({ language }: Props) {
           <ArrowRight size={14} />
         </a>
       </div>
+
+      <button
+        type="button"
+        onClick={openWelcomeGuide}
+        className="text-xs font-bold text-indigo-600 underline hover:text-indigo-800"
+      >
+        {T.keyWherePrompt}
+      </button>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-900">
         <strong className="font-black">{T.keyPrivateLead}</strong> {T.keyPrivateBody}

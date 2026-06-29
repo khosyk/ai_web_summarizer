@@ -271,20 +271,24 @@ function ImageLightbox({
 			aria-label={target.alt}
 			onClick={onClose}
 		>
-			<button
-				type="button"
-				onClick={onClose}
-				className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-				aria-label="Close"
-			>
-				<X size={22} />
-			</button>
-			<img
-				src={target.src}
-				alt={target.alt}
-				className="max-h-[90vh] max-w-[min(96vw,900px)] rounded-lg object-contain shadow-2xl"
+			<div
+				className="relative max-w-[min(96vw,900px)]"
 				onClick={(e) => e.stopPropagation()}
-			/>
+			>
+				<button
+					type="button"
+					onClick={onClose}
+					className="absolute -right-3 -top-3 z-10 rounded-full bg-slate-800/90 p-2 text-white shadow-lg hover:bg-slate-700 border-2 border-white"
+					aria-label="Close"
+				>
+					<X size={22} />
+				</button>
+				<img
+					src={target.src}
+					alt={target.alt}
+					className="max-h-[90vh] w-full rounded-lg object-contain shadow-2xl"
+				/>
+			</div>
 		</div>
 	);
 }
@@ -311,7 +315,7 @@ function GuideImageThumb({
 			<img
 				src={src}
 				alt={alt}
-				className="mx-auto h-48 w-full object-contain"
+				className="mx-auto h-[242px] w-full object-contain"
 				loading="lazy"
 			/>
 			<span className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded-md bg-slate-900/65 px-1.5 py-0.5 text-[9px] font-bold text-white opacity-0 transition group-hover:opacity-100">
