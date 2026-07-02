@@ -16,16 +16,11 @@ export const GEMINI_SUMMARY_RESPONSE_SCHEMA = {
 			items: { type: "string" },
 			minItems: 3,
 			maxItems: 3,
+			description:
+				"Exactly three one-sentence summary lines: what happened, why it matters, tab action.",
 		},
-		fullSummary: { type: "string" },
 	},
-	required: [
-		"readRecommendation",
-		"readReason",
-		"title",
-		"briefLines",
-		"fullSummary",
-	],
+	required: ["readRecommendation", "readReason", "title", "briefLines"],
 } as const;
 
 export type StructuredSummary = {
@@ -33,7 +28,6 @@ export type StructuredSummary = {
 	readReason: string;
 	title: string;
 	briefLines: string[];
-	fullSummary: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,7 +84,6 @@ export function parseStructuredSummary(
 	);
 	const readReason = normalizeLine(parsed.readReason);
 	const titleRaw = normalizeLine(parsed.title);
-	const fullSummary = normalizeLine(parsed.fullSummary);
 	const briefRaw = parsed.briefLines;
 
 	if (!readReason) {
@@ -110,10 +103,6 @@ export function parseStructuredSummary(
 		throw new WebSummaryError("E10", "brief_lines");
 	}
 
-	if (!fullSummary) {
-		throw new WebSummaryError("E10", "full_summary");
-	}
-
 	const title =
 		titleRaw || pickSummaryDisplayTitle(scrapedTitle, outputLanguage);
 
@@ -122,6 +111,5 @@ export function parseStructuredSummary(
 		readReason,
 		title,
 		briefLines,
-		fullSummary,
 	};
 }

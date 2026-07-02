@@ -24,7 +24,7 @@ const API_KEY_URL = "https://aistudio.google.com/apikey";
 type GuideStep = {
 	title: string;
 	caption: string;
-	image: string;
+	image?: string;
 };
 
 type WelcomeCopy = {
@@ -85,7 +85,7 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		step2Image: "guide-step-4-paste-settings.png",
 		step3Title: "4. Summarize any article tab",
 		step3Desc:
-			"With the side panel open, go to an http(s) article tab and tap Summarize this tab. You will see read or skip, three lines, and a full summary.",
+			"With the side panel open, go to an http(s) article tab and tap Summarize this tab. You will see read or skip, a headline, and three one-sentence lines.",
 		stepQnaTitle: "5. Q&A",
 		stepQnaDesc:
 			"Common questions about API keys, free tier limits, privacy, and errors. Tap a question to expand.",
@@ -93,6 +93,11 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		qnaTooltip: "Having trouble?",
 		imageZoomHint: "Click image to enlarge",
 		guideSteps: [
+			{
+				title: "Sign in with Google",
+				caption:
+					"Sign in with your Google account before creating an API key. If you see a login screen, complete sign-in first.",
+			},
 			{
 				title: "Click Create API key",
 				caption:
@@ -137,7 +142,7 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		step2Image: "guide-step-4-paste-settings.png",
 		step3Title: "4. 기사 탭 요약하기",
 		step3Desc:
-			"사이드패널을 연 채 http(s) 기사 탭으로 이동해 Summarize this tab을 누르세요. 읽기/건너뛰기, 세 줄, 전체 요약이 표시됩니다.",
+			"사이드패널을 연 채 http(s) 기사 탭으로 이동해 Summarize this tab을 누르세요. 읽기/건너뛰기, 제목, 한 문장씩 세 줄 요약이 표시됩니다.",
 		stepQnaTitle: "5. Q&A",
 		stepQnaDesc:
 			"API 키, 무료 한도, 개인정보, 오류에 대한 자주 묻는 질문. 질문을 눌러 펼치세요.",
@@ -145,6 +150,11 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		qnaTooltip: "문제가 있나요?",
 		imageZoomHint: "이미지를 클릭해 확대",
 		guideSteps: [
+			{
+				title: "Google 로그인",
+				caption:
+					"API 키를 만들려면 Google 계정 로그인이 필요합니다. 로그인 화면이 나오면 계정으로 로그인하세요.",
+			},
 			{
 				title: "Create API key 클릭",
 				caption:
@@ -186,7 +196,7 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		step2Image: "guide-step-4-paste-settings.png",
 		step3Title: "4. 摘要任意文章标签页",
 		step3Desc:
-			"保持侧边栏打开，切换到 http(s) 文章页，点击「摘要当前标签」。将看到读/跳过判断、三行摘要与全文摘要。",
+			"保持侧边栏打开，切换到 http(s) 文章页，点击「摘要当前标签」。将看到读/跳过判断、标题与三行单句摘要。",
 		stepQnaTitle: "5. 常见问题",
 		stepQnaDesc:
 			"关于 API 密钥、免费额度、隐私与报错的常见问题。点击问题展开答案。",
@@ -194,6 +204,11 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		qnaTooltip: "遇到问题？",
 		imageZoomHint: "点击图片放大查看",
 		guideSteps: [
+			{
+				title: "登录 Google 账号",
+				caption:
+					"创建 API 密钥前需登录 Google 账号。若出现登录提示，请先完成登录。",
+			},
 			{
 				title: "点击 Create API key",
 				caption: "打开 Google AI Studio → API Key，点击右上角 Create API key。",
@@ -340,19 +355,29 @@ function GuideImageCard({
 	const alt = `${step.title} — step ${index + 1}`;
 	return (
 		<figure className="space-y-2">
-			<GuideImageThumb
-				image={step.image}
-				alt={alt}
-				zoomHint={zoomHint}
-				onOpen={() => onOpenImage({ src: welcomeAsset(step.image), alt })}
-			/>
+			{step.image ? (
+				<GuideImageThumb
+					image={step.image}
+					alt={alt}
+					zoomHint={zoomHint}
+					onOpen={() => onOpenImage({ src: welcomeAsset(step.image!), alt })}
+				/>
+			) : (
+				<div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+					<p className="text-[11px] leading-relaxed text-amber-900">
+						{step.caption}
+					</p>
+				</div>
+			)}
 			<figcaption className="space-y-0.5">
 				<p className="text-[12px] font-black text-slate-800">
 					{index + 1}. {step.title}
 				</p>
-				<p className="text-[11px] leading-relaxed text-slate-500">
-					{step.caption}
-				</p>
+				{step.image ? (
+					<p className="text-[11px] leading-relaxed text-slate-500">
+						{step.caption}
+					</p>
+				) : null}
 			</figcaption>
 		</figure>
 	);
@@ -485,7 +510,7 @@ function WelcomePage() {
 
 						<div className="grid gap-3 sm:grid-cols-1">
 							{T.guideSteps.map((step, idx) => (
-								<div key={step.image}>
+								<div key={`${step.title}-${idx}`}>
 									<GuideImageCard
 										step={step}
 										index={idx}

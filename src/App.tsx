@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { FileText, ArrowRight, Clock, Settings } from "lucide-react";
 import { extractLoadingSnippets } from "./extractLoadingSnippets";
@@ -12,9 +12,15 @@ import {
 	getUiLanguage,
 	setUiLanguage,
 	UI_LANGUAGE_STORAGE_KEY,
+	getAutoSummarizeEnabled,
+	setAutoSummarizeEnabled,
+	AUTO_SUMMARIZE_STORAGE_KEY,
+	getHasCompletedFirstSummary,
+	setHasCompletedFirstSummary,
+	FIRST_SUMMARY_COMPLETED_STORAGE_KEY,
 } from "./uiLanguageStorage";
 import type { ServiceLang } from "./privacyNotice";
-import { summarizeArticle, MAX_INPUT_CHARS } from "./geminiClient";
+import { summarizeArticle } from "./geminiClient";
 import { isServiceLang } from "./supportedLanguages";
 import {
 	isErrorCode,
@@ -26,6 +32,10 @@ import { PRODUCT_DISPLAY_NAME } from "./productBrand";
 
 function isChromeExtension(): boolean {
 	return typeof chrome !== "undefined" && Boolean(chrome.runtime?.id);
+}
+
+function isAbortError(error: unknown): boolean {
+	return error instanceof DOMException && error.name === "AbortError";
 }
 
 type UiCopy = {
@@ -42,13 +52,18 @@ type UiCopy = {
 	statsFromTab: string;
 	statsSubtitle: string;
 	loadingFromPage: string;
+	stopAnalysisBtn: string;
 	processing: string;
 	settings: string;
+	autoOff: string;
+	autoOn: string;
 	apiKeyBanner: string;
 	apiKeyBannerBtn: string;
 	setupGuideBtn: string;
 	setupEmptyHint: string;
-	inputTruncatedNote: string;
+	readyEmptyTitle: string;
+	readyEmptyBody: string;
+	readyEmptyAutoNote: string;
 	copySummary: string;
 	copiedSummary: string;
 };
@@ -60,8 +75,6 @@ type AppSummaryResult = {
 	readReason: string;
 	title: string;
 	briefLines: string[];
-	fullSummary: string;
-	wasInputTruncated: boolean;
 	stats: {
 		originalLength: number;
 		model?: string;
@@ -77,7 +90,7 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 		title: PRODUCT_DISPLAY_NAME,
 		analyzeBtn: "Summarize this tab",
 		languageChange: "Change language",
-		emptyHint: "Open an article page and tap Summarize",
+		emptyHint: "Open an article tab and tap Summarize this tab",
 		errDialogTitle: "Something went wrong",
 		errDialogClose: "OK",
 		statsSource: "Source",
@@ -87,21 +100,28 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 		statsFromTab: "Current tab",
 		statsSubtitle: "Meta",
 		loadingFromPage: "From the page",
+		stopAnalysisBtn: "Stop summarizing",
 		processing: "Summarizing with Gemini…",
 		settings: "Settings",
+		autoOff: "⚡ Auto OFF",
+		autoOn: "⚡ Auto ON",
 		apiKeyBanner: "Setup required",
 		apiKeyBannerBtn: "Settings",
 		setupGuideBtn: "Setup guide",
 		setupEmptyHint: "Open the setup guide to continue.",
-		inputTruncatedNote: `Long page — only the first ~${MAX_INPUT_CHARS.toLocaleString("en-US")} characters were sent.`,
+		readyEmptyTitle: "You're all set",
+		readyEmptyBody:
+			"Open the article tab you want summarized, then tap Summarize this tab below.",
+		readyEmptyAutoNote:
+			"Auto is on — stay on an article tab for a few seconds to summarize automatically.",
 		copySummary: "Copy",
 		copiedSummary: "Copied",
 	},
 	Korean: {
 		title: PRODUCT_DISPLAY_NAME,
-		analyzeBtn: "이 탭 요약하기",
+		analyzeBtn: "현재 탭 요약하기",
 		languageChange: "언어 변경",
-		emptyHint: "기사 페이지를 연 뒤 요약하기를 누르세요",
+		emptyHint: "기사 탭에서 요약하기를 누르세요",
 		errDialogTitle: "문제가 발생했습니다",
 		errDialogClose: "확인",
 		statsSource: "출처",
@@ -111,13 +131,20 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 		statsFromTab: "현재 탭",
 		statsSubtitle: "메타",
 		loadingFromPage: "페이지에서",
+		stopAnalysisBtn: "요약 중지",
 		processing: "Gemini로 요약 중…",
 		settings: "설정",
+		autoOff: "⚡ Auto OFF",
+		autoOn: "⚡ Auto ON",
 		apiKeyBanner: "설정 필요",
 		apiKeyBannerBtn: "설정",
 		setupGuideBtn: "설정 가이드",
 		setupEmptyHint: "설정 가이드를 열어 계속 진행하세요.",
-		inputTruncatedNote: `긴 페이지 — 앞부분 약 ${MAX_INPUT_CHARS.toLocaleString("en-US")}자만 전송했습니다.`,
+		readyEmptyTitle: "준비됐어요",
+		readyEmptyBody:
+			"요약할 기사 탭으로 이동한 뒤, 아래 「현재 탭 요약하기」를 누르세요.",
+		readyEmptyAutoNote:
+			"Auto가 켜져 있으면 기사 탭에서 잠시 머물면 자동으로 요약됩니다.",
 		copySummary: "복사",
 		copiedSummary: "복사됨",
 	},
@@ -125,7 +152,7 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 		title: PRODUCT_DISPLAY_NAME,
 		analyzeBtn: "摘要当前标签",
 		languageChange: "更改语言",
-		emptyHint: "打开文章页后点击摘要",
+		emptyHint: "打开文章页后点击摘要当前标签",
 		errDialogTitle: "出错了",
 		errDialogClose: "确定",
 		statsSource: "来源",
@@ -135,13 +162,18 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 		statsFromTab: "当前标签",
 		statsSubtitle: "摘要信息",
 		loadingFromPage: "页面摘取",
+		stopAnalysisBtn: "停止摘要",
 		processing: "Gemini 摘要中…",
 		settings: "设置",
+		autoOff: "⚡ Auto OFF",
+		autoOn: "⚡ Auto ON",
 		apiKeyBanner: "需要完成设置",
 		apiKeyBannerBtn: "设置",
 		setupGuideBtn: "设置指南",
 		setupEmptyHint: "请打开设置指南继续。",
-		inputTruncatedNote: `页面较长 — 仅发送了前约 ${MAX_INPUT_CHARS.toLocaleString("en-US")} 个字符。`,
+		readyEmptyTitle: "已准备就绪",
+		readyEmptyBody: "切换到要摘要的文章标签页，然后点击下方「摘要当前标签」。",
+		readyEmptyAutoNote: "已开启 Auto — 在文章标签页停留几秒即可自动摘要。",
 		copySummary: "复制",
 		copiedSummary: "已复制",
 	},
@@ -149,93 +181,89 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 
 const getT = (lang: string) => TRANSLATIONS[lang] ?? TRANSLATIONS.English;
 
+const AUTO_SUMMARIZE_DWELL_MS = 3000;
+
 const LOADING_PHASE_COPY: Record<
-	string,
+	ServiceLang,
 	Array<{ line: string; hint: string }>
 > = {
 	English: [
 		{
-			line: "Gathering body text",
-			hint: "Article-style pages work best; we may use broader visible text on other layouts.",
+			line: "Reading the page",
+			hint: "Pulling out the main article text from this tab.",
 		},
 		{
-			line: "Sizing to send",
-			hint: `We cap what we send (about ${String(MAX_INPUT_CHARS)} chars from the top).`,
+			line: "Preparing the draft",
+			hint: "Keeping the parts that matter most for a clear summary.",
 		},
 		{
-			line: "Calling Gemini",
-			hint: "Uses your API key and Google’s generativelanguage endpoint.",
+			line: "Writing the summary",
+			hint: "Deciding read or skip and three one-sentence lines.",
 		},
 		{
-			line: "Waiting on the model",
-			hint: "A good moment for a sip of tea.",
+			line: "Finishing up",
+			hint: "Almost done—thanks for waiting.",
 		},
 	],
 	Korean: [
 		{
-			line: "본문 수집 중",
-			hint: "기사형 페이지가 가장 잘 됩니다. 다른 레이아웃은 더 넓은 본문을 사용할 수 있습니다.",
+			line: "페이지 읽는 중",
+			hint: "이 탭에서 기사 본문을 가져오고 있어요.",
 		},
 		{
-			line: "전송 분량 조정",
-			hint: `앞부분 약 ${String(MAX_INPUT_CHARS)}자까지만 보냅니다.`,
+			line: "요약 준비 중",
+			hint: "요약에 필요한 핵심 내용만 정리하고 있어요.",
 		},
 		{
-			line: "Gemini 호출",
-			hint: "저장된 API 키로 Google generativelanguage 엔드포인트를 사용합니다.",
+			line: "요약 작성 중",
+			hint: "읽기/건너뛰기와 한 문장씩 세 줄을 작성하고 있어요.",
 		},
 		{
-			line: "모델 응답 대기",
-			hint: "잠깐 여유를 가져도 좋습니다.",
+			line: "마무리 중",
+			hint: "거의 다 됐어요. 잠시만 기다려 주세요.",
 		},
 	],
 	Chinese: [
 		{
-			line: "采集正文",
-			hint: "文章页效果最好；非文章页可能使用更宽的可见正文。",
+			line: "读取页面",
+			hint: "正在从当前标签提取文章正文。",
 		},
 		{
-			line: "控制发送体量",
-			hint: `从开头截取约最多 ${String(MAX_INPUT_CHARS)} 字符再发送。`,
+			line: "整理要点",
+			hint: "保留对摘要最重要的内容。",
 		},
 		{
-			line: "调用 Gemini",
-			hint: "使用您保存的 API 密钥请求 Google 接口。",
+			line: "撰写摘要",
+			hint: "正在判断读/跳过并撰写三行单句摘要。",
 		},
 		{
-			line: "等待模型返回",
-			hint: "可以稍微转移一下注意力。",
+			line: "即将完成",
+			hint: "快好了，请稍候。",
 		},
 	],
 };
 
-function loadingPhasesFor(lang: string) {
+function loadingPhasesFor(lang: ServiceLang) {
 	return LOADING_PHASE_COPY[lang] ?? LOADING_PHASE_COPY.English;
 }
 
 const LOADING_WAIT_HINTS: Record<ServiceLang, string[]> = {
 	English: [
-		"Still waiting on the model…",
-		"Long articles can take a few more seconds.",
-		"Trying another model if the first one is busy.",
-		"Packaging read/skip, three lines, and full summary.",
-		"Your API key is calling Google from this browser.",
+		"Still putting the summary together…",
+		"Long pages can take a little longer.",
+		"Packaging read/skip and three one-liners.",
 		"Almost there—hang tight.",
 	],
 	Korean: [
-		"모델 응답을 기다리는 중…",
-		"긴 기사는 조금 더 걸릴 수 있어요.",
-		"첫 모델이 바쁘면 다른 모델로 재시도합니다.",
-		"읽기/건너뛰기·세 줄·전체 요약을 정리하고 있어요.",
-		"브라우저에서 Google API로 직접 요청 중입니다.",
+		"요약을 마무리하는 중이에요…",
+		"긴 페이지는 조금 더 걸릴 수 있어요.",
+		"읽기/건너뛰기와 한 문장씩 세 줄을 정리하고 있어요.",
 		"곧 완료됩니다. 잠시만 기다려 주세요.",
 	],
 	Chinese: [
-		"仍在等待模型返回…",
-		"较长文章可能需要多几秒。",
-		"若首个模型繁忙会尝试其他模型。",
-		"正在整理读/跳过、三行与全文摘要。",
-		"正在通过浏览器用您的密钥请求 Google。",
+		"仍在整理摘要…",
+		"较长页面可能需要多几秒。",
+		"正在整理读/跳过与三行单句摘要。",
 		"即将完成，请稍候。",
 	],
 };
@@ -319,8 +347,10 @@ export default function App() {
 	const [language, setLanguageState] = useState<ServiceLang>(() =>
 		detectServiceLang(),
 	);
-	const [displayUrl, setDisplayUrl] = useState("");
 	const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+	const [hasCompletedFirstSummary, setHasCompletedFirstSummaryState] =
+		useState<boolean | null>(null);
+	const [autoSummarizeEnabled, setAutoSummarizeEnabledState] = useState(false);
 	const [result, setResult] = useState<AppSummaryResult | null>(null);
 
 	const [loadingPhaseIdx, setLoadingPhaseIdx] = useState(0);
@@ -331,10 +361,183 @@ export default function App() {
 		message: string;
 	}>({ isOpen: false, message: "" });
 
+	const autoDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const autoDwellGenerationRef = useRef(0);
+	const analysisRunIdRef = useRef(0);
+	const analysisAbortRef = useRef<AbortController | null>(null);
+	const autoSummarizeEnabledRef = useRef(autoSummarizeEnabled);
+	const hasApiKeyRef = useRef(hasApiKey);
+	const isProcessingRef = useRef(isProcessing);
+	const resultRef = useRef(result);
+	const languageRef = useRef(language);
+
+	autoSummarizeEnabledRef.current = autoSummarizeEnabled;
+	hasApiKeyRef.current = hasApiKey;
+	isProcessingRef.current = isProcessing;
+	resultRef.current = result;
+	languageRef.current = language;
+
 	const T = getT(language);
+
+	const clearAutoDwellTimer = useCallback(() => {
+		if (autoDwellTimerRef.current) {
+			window.clearTimeout(autoDwellTimerRef.current);
+			autoDwellTimerRef.current = null;
+		}
+	}, []);
+
+	const showError = useCallback((error: unknown) => {
+		const { message, logDetail } = resolveUserFacingError(
+			error,
+			languageRef.current,
+		);
+		console.error("[Web Summary]", logDetail);
+		setErrorDialog({ isOpen: true, message });
+	}, []);
+
+	const handleCancelAnalysis = useCallback(() => {
+		analysisRunIdRef.current += 1;
+		analysisAbortRef.current?.abort();
+		clearAutoDwellTimer();
+		setIsProcessing(false);
+		setLoadingSnippets([]);
+	}, [clearAutoDwellTimer]);
+
+	const runAnalysis = useCallback(
+		async (trigger: "manual" | "auto" = "manual") => {
+			if (isProcessingRef.current) return;
+
+			if (!isChromeExtension()) {
+				if (trigger === "manual") showError(new WebSummaryError("E01"));
+				return;
+			}
+
+			const apiKey = await getGeminiApiKey();
+			if (!apiKey) {
+				setHasApiKey(false);
+				if (trigger === "manual") showError(new WebSummaryError("E02"));
+				return;
+			}
+			setHasApiKey(true);
+
+			const [tab] = await chrome.tabs.query({
+				active: true,
+				currentWindow: true,
+			});
+			const tabUrl = tab?.url ?? "";
+			if (!tab?.id || !tabUrl.startsWith("http")) {
+				if (trigger === "manual") showError(new WebSummaryError("E03"));
+				return;
+			}
+
+			const currentLanguage = languageRef.current;
+			const currentResult = resultRef.current;
+			if (
+				currentResult &&
+				currentResult.sourceTabUrl === tabUrl &&
+				currentResult.summaryLanguage === currentLanguage
+			) {
+				return;
+			}
+
+			const runId = analysisRunIdRef.current + 1;
+			analysisRunIdRef.current = runId;
+			const abortController = new AbortController();
+			analysisAbortRef.current = abortController;
+
+			setLoadingSnippets([]);
+			setIsProcessing(true);
+			setResult(null);
+
+			try {
+				const data = await extractPageDataFromTab(tab.id);
+				if (runId !== analysisRunIdRef.current) return;
+
+				if (data.errorCode || data.error) {
+					if (data.errorCode && isErrorCode(data.errorCode)) {
+						throw new WebSummaryError(data.errorCode, data.error);
+					}
+					throw new WebSummaryError("E05", data.error);
+				}
+
+				const raw = (data.articleText ?? data.textContent ?? "").trim();
+				if (raw.length < 48) {
+					throw new WebSummaryError("E06");
+				}
+
+				setLoadingSnippets(extractLoadingSnippets(raw, data.title));
+
+				const summary = await summarizeArticle({
+					apiKey,
+					language: currentLanguage,
+					articleTitle: data.title,
+					articleText: raw,
+					signal: abortController.signal,
+				});
+
+				if (runId !== analysisRunIdRef.current) return;
+
+				setResult({
+					...summary,
+					sourceTabUrl: tabUrl,
+					summaryLanguage: currentLanguage,
+				});
+				setHasCompletedFirstSummaryState(true);
+				void setHasCompletedFirstSummary();
+			} catch (e: unknown) {
+				if (isAbortError(e) || abortController.signal.aborted) return;
+				showError(e);
+			} finally {
+				if (runId === analysisRunIdRef.current) {
+					analysisAbortRef.current = null;
+					setIsProcessing(false);
+					setLoadingSnippets([]);
+				}
+			}
+		},
+		[showError],
+	);
+
+	const scheduleAutoSummarize = useCallback(() => {
+		clearAutoDwellTimer();
+		if (!autoSummarizeEnabledRef.current || hasApiKeyRef.current !== true) {
+			return;
+		}
+
+		const generation = ++autoDwellGenerationRef.current;
+		autoDwellTimerRef.current = window.setTimeout(() => {
+			if (generation !== autoDwellGenerationRef.current) return;
+			if (!autoSummarizeEnabledRef.current || isProcessingRef.current) return;
+
+			void (async () => {
+				if (!isChromeExtension()) return;
+
+				const [tab] = await chrome.tabs.query({
+					active: true,
+					currentWindow: true,
+				});
+				const tabUrl = tab?.url ?? "";
+				if (!tab?.id || !tabUrl.startsWith("http")) return;
+
+				const currentResult = resultRef.current;
+				const currentLanguage = languageRef.current;
+				if (
+					currentResult &&
+					currentResult.sourceTabUrl === tabUrl &&
+					currentResult.summaryLanguage === currentLanguage
+				) {
+					return;
+				}
+
+				await runAnalysis("auto");
+			})();
+		}, AUTO_SUMMARIZE_DWELL_MS);
+	}, [clearAutoDwellTimer, runAnalysis]);
 
 	useEffect(() => {
 		void getUiLanguage().then(setLanguageState);
+		void getAutoSummarizeEnabled().then(setAutoSummarizeEnabledState);
+		void getHasCompletedFirstSummary().then(setHasCompletedFirstSummaryState);
 	}, []);
 
 	useEffect(() => {
@@ -358,6 +561,16 @@ export default function App() {
 				if (isServiceLang(next)) {
 					setLanguageState(next);
 				}
+			}
+			if (AUTO_SUMMARIZE_STORAGE_KEY in changes) {
+				setAutoSummarizeEnabledState(
+					changes[AUTO_SUMMARIZE_STORAGE_KEY].newValue === true,
+				);
+			}
+			if (FIRST_SUMMARY_COMPLETED_STORAGE_KEY in changes) {
+				setHasCompletedFirstSummaryState(
+					changes[FIRST_SUMMARY_COMPLETED_STORAGE_KEY].newValue === true,
+				);
 			}
 		};
 
@@ -384,11 +597,52 @@ export default function App() {
 		void setUiLanguage(next);
 	};
 
-	const showError = (error: unknown) => {
-		const { message, logDetail } = resolveUserFacingError(error, language);
-		console.error("[Web Summary]", logDetail);
-		setErrorDialog({ isOpen: true, message });
+	const handleAutoSummarizeToggle = () => {
+		const next = !autoSummarizeEnabled;
+		if (next && hasApiKey !== true) {
+			showError(new WebSummaryError("E02"));
+			return;
+		}
+		setAutoSummarizeEnabledState(next);
+		void setAutoSummarizeEnabled(next);
 	};
+
+	useEffect(() => {
+		if (!autoSummarizeEnabled) {
+			clearAutoDwellTimer();
+			return;
+		}
+		scheduleAutoSummarize();
+		return clearAutoDwellTimer;
+	}, [
+		autoSummarizeEnabled,
+		hasApiKey,
+		language,
+		scheduleAutoSummarize,
+		clearAutoDwellTimer,
+	]);
+
+	useEffect(() => {
+		if (!autoSummarizeEnabled || !isChromeExtension()) return;
+
+		const onTabContextChange = () => scheduleAutoSummarize();
+		const onTabUpdated = (
+			_tabId: number,
+			changeInfo: { status?: string; url?: string },
+		) => {
+			if (changeInfo.status === "complete" || changeInfo.url) {
+				scheduleAutoSummarize();
+			}
+		};
+
+		chrome.tabs.onActivated.addListener(onTabContextChange);
+		chrome.tabs.onUpdated.addListener(onTabUpdated);
+		return () => {
+			chrome.tabs.onActivated.removeListener(onTabContextChange);
+			chrome.tabs.onUpdated.removeListener(onTabUpdated);
+			clearAutoDwellTimer();
+		};
+	}, [autoSummarizeEnabled, scheduleAutoSummarize, clearAutoDwellTimer]);
 
 	useEffect(() => {
 		if (!isProcessing) {
@@ -424,86 +678,7 @@ export default function App() {
 		return () => window.clearInterval(interval);
 	}, [isWaitingOnModel, language]);
 
-	const handleStartAnalysis = async () => {
-		if (isProcessing) return;
-
-		if (!isChromeExtension()) {
-			showError(new WebSummaryError("E01"));
-			return;
-		}
-
-		const apiKey = await getGeminiApiKey();
-		if (!apiKey) {
-			setHasApiKey(false);
-			showError(new WebSummaryError("E02"));
-			return;
-		}
-		setHasApiKey(true);
-
-		const [tab] = await chrome.tabs.query({
-			active: true,
-			currentWindow: true,
-		});
-		const tabUrl = tab?.url ?? "";
-		if (!tab?.id || !tabUrl.startsWith("http")) {
-			showError(new WebSummaryError("E03"));
-			return;
-		}
-
-		if (
-			result &&
-			result.sourceTabUrl === tabUrl &&
-			result.summaryLanguage === language
-		) {
-			return;
-		}
-
-		setLoadingSnippets([]);
-		setIsProcessing(true);
-		setResult(null);
-
-		try {
-			setDisplayUrl(tabUrl);
-
-			const data = await extractPageDataFromTab(tab.id);
-
-			if (data.errorCode || data.error) {
-				if (data.errorCode && isErrorCode(data.errorCode)) {
-					throw new WebSummaryError(data.errorCode, data.error);
-				}
-				throw new WebSummaryError("E05", data.error);
-			}
-
-			const raw = (data.articleText ?? data.textContent ?? "").trim();
-			if (raw.length < 48) {
-				throw new WebSummaryError("E06");
-			}
-
-			const wasInputTruncated = raw.length > MAX_INPUT_CHARS;
-			const articleText = raw.slice(0, MAX_INPUT_CHARS);
-			setLoadingSnippets(extractLoadingSnippets(articleText, data.title));
-			setDisplayUrl(data.url || tabUrl);
-
-			const summary = await summarizeArticle({
-				apiKey,
-				language,
-				articleTitle: data.title,
-				articleText,
-			});
-
-			setResult({
-				...summary,
-				wasInputTruncated,
-				sourceTabUrl: tabUrl,
-				summaryLanguage: language,
-			});
-		} catch (e: unknown) {
-			showError(e);
-		} finally {
-			setIsProcessing(false);
-			setLoadingSnippets([]);
-		}
-	};
+	const handleStartAnalysis = () => void runAnalysis("manual");
 
 	return (
 		<div className="flex h-screen flex-col overflow-hidden bg-[#F8FAFC] font-sans text-[#1E293B]">
@@ -564,18 +739,45 @@ export default function App() {
 					</div>
 				) : null}
 
-				<button
-					onClick={() => void handleStartAnalysis()}
-					disabled={isProcessing}
-					className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all shadow-lg active:scale-95 ${
-						isProcessing
-							? "cursor-not-allowed bg-slate-100 text-slate-400 shadow-none"
-							: "bg-indigo-600 text-white shadow-indigo-600/25 hover:bg-indigo-700"
-					}`}
-				>
-					{isProcessing ? T.processing : T.analyzeBtn}
-					{!isProcessing && <ArrowRight size={16} />}
-				</button>
+				<div className={`flex ${autoSummarizeEnabled ? "gap-0" : "gap-2"}`}>
+					<button
+						type="button"
+						onClick={() => void handleStartAnalysis()}
+						disabled={isProcessing || autoSummarizeEnabled}
+						className={`flex min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-black transition-all duration-200 ${
+							autoSummarizeEnabled
+								? "w-0 max-w-0 flex-[0] overflow-hidden border-0 p-0 opacity-0"
+								: "flex-[8] py-2.5"
+						} ${
+							isProcessing
+								? "cursor-not-allowed bg-slate-100 text-slate-400 shadow-none"
+								: autoSummarizeEnabled
+									? "pointer-events-none"
+									: "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-700 active:scale-95"
+						}`}
+					>
+						<span className="truncate">
+							{isProcessing ? T.processing : T.analyzeBtn}
+						</span>
+					</button>
+					<button
+						type="button"
+						onClick={handleAutoSummarizeToggle}
+						disabled={hasApiKey === false || isProcessing}
+						className={`flex min-w-0 items-center justify-center rounded-xl px-2 py-2.5 text-[10px] font-black transition-all duration-200 active:scale-95 ${
+							autoSummarizeEnabled ? "flex-1" : "flex-[2]"
+						} ${
+							autoSummarizeEnabled
+								? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-700"
+								: "border border-slate-200 bg-white text-slate-500 shadow-none hover:border-slate-300 hover:bg-slate-50"
+						} disabled:cursor-not-allowed disabled:opacity-40`}
+						title={autoSummarizeEnabled ? T.autoOn : T.autoOff}
+					>
+						<span className="truncate">
+							{autoSummarizeEnabled ? T.autoOn : T.autoOff}
+						</span>
+					</button>
+				</div>
 			</header>
 
 			<main className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30 p-4 custom-scrollbar">
@@ -649,9 +851,6 @@ export default function App() {
 													? activeWaitingHint
 													: phases[phasedIdx].hint}
 											</p>
-											<p className="mt-2 truncate font-mono text-[9px] text-indigo-300/95">
-												{displayUrl}
-											</p>
 										</motion.div>
 									</AnimatePresence>
 
@@ -661,6 +860,16 @@ export default function App() {
 										label={T.loadingFromPage}
 										cycleFast={isWaitingOnModel}
 									/>
+
+									<div className="mt-5 flex justify-center">
+										<button
+											type="button"
+											onClick={handleCancelAnalysis}
+											className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-[10px] font-black text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+										>
+											{T.stopAnalysisBtn}
+										</button>
+									</div>
 								</div>
 							</motion.div>
 						)}
@@ -676,17 +885,10 @@ export default function App() {
 									readReason={result.readReason}
 									title={result.title}
 									briefLines={result.briefLines}
-									fullSummary={result.fullSummary}
 									language={language}
 									copyLabel={T.copySummary}
 									copiedLabel={T.copiedSummary}
 								/>
-
-								{result.wasInputTruncated ? (
-									<p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-800">
-										{T.inputTruncatedNote}
-									</p>
-								) : null}
 
 								<div className="bg-slate-900 text-white rounded-2xl p-4 shadow-xl">
 									<div className="mb-3 border-b border-slate-800 pb-2">
@@ -741,11 +943,37 @@ export default function App() {
 							</motion.div>
 						) : (
 							!isProcessing && (
-								<div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
+								<div
+									className={`flex flex-col items-center justify-center px-4 py-20 text-center ${
+										hasApiKey === true && hasCompletedFirstSummary === false
+											? "opacity-60"
+											: "opacity-40"
+									}`}
+								>
 									<FileText size={48} className="text-slate-300 mb-4" />
-									<h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
-										{hasApiKey === false ? T.setupEmptyHint : T.emptyHint}
-									</h3>
+									{hasApiKey === false ? (
+										<h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+											{T.setupEmptyHint}
+										</h3>
+									) : hasCompletedFirstSummary === false ? (
+										<div className="max-w-[17rem] space-y-2">
+											<h3 className="text-sm font-black text-slate-600">
+												{T.readyEmptyTitle}
+											</h3>
+											<p className="text-xs font-medium leading-relaxed text-slate-500">
+												{T.readyEmptyBody}
+											</p>
+											{autoSummarizeEnabled ? (
+												<p className="text-[10px] font-medium leading-relaxed text-indigo-500/90">
+													{T.readyEmptyAutoNote}
+												</p>
+											) : null}
+										</div>
+									) : (
+										<h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+											{T.emptyHint}
+										</h3>
+									)}
 								</div>
 							)
 						)}

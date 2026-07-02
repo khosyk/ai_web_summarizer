@@ -6,6 +6,10 @@ import {
 import { pickSummaryDisplayTitle } from "./summaryParse";
 import type { ServiceLang } from "./privacyNotice";
 import {
+	applyTokenDiet,
+	articleLocaleFromServiceLang,
+} from "./articleTokenDiet";
+import {
 	GEMINI_SUMMARY_RESPONSE_SCHEMA,
 	parseStructuredSummary,
 } from "./summaryStructured";
@@ -15,7 +19,7 @@ import {
 } from "./userFacingError";
 
 export const MAX_INPUT_CHARS = 8000;
-export const MAX_OUTPUT_TOKENS = 1024;
+export const MAX_OUTPUT_TOKENS = 384;
 const SUMMARY_PARSE_MAX_ATTEMPTS = 3;
 
 type GeminiPart = { text?: string };
@@ -36,8 +40,28 @@ function extractGeminiText(data: Record<string, unknown>): string {
 		.trim();
 }
 
-function sleepMs(ms: number) {
-	return new Promise<void>((r) => setTimeout(r, ms));
+function sleepMs(ms: number, signal?: AbortSignal) {
+	return new Promise<void>((resolve, reject) => {
+		if (signal?.aborted) {
+			reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+			return;
+		}
+		const timer = window.setTimeout(() => resolve(), ms);
+		signal?.addEventListener(
+			"abort",
+			() => {
+				window.clearTimeout(timer);
+				reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+			},
+			{ once: true },
+		);
+	});
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+	if (signal?.aborted) {
+		throw signal.reason ?? new DOMException("Aborted", "AbortError");
+	}
 }
 
 function parseRetryAfterMs(message: string): number | null {
@@ -50,98 +74,151 @@ function parseRetryAfterMs(message: string): number | null {
 
 const GEMINI_REST = "https://generativelanguage.googleapis.com/v1beta/models";
 
-const GEMINI_MODEL_DEFAULTS = [
-	"gemini-2.5-flash-lite",
-	"gemini-2.5-flash",
-	"gemini-flash-latest",
-	"gemini-2.0-flash",
-] as const;
+export const GEMINI_MODEL = "gemini-2.5-flash-lite";
+export const GEMINI_MODEL_FALLBACK = "gemini-2.5-flash";
+
+const PRIMARY_MAX_ATTEMPTS = 3;
+const FALLBACK_MAX_ATTEMPTS = 2;
+
+type GeminiErrBody = {
+	message?: string;
+	code?: number;
+	status?: string;
+};
+
+/** lite 실패 시 flash fallback — E11·E10 제외 */
+function isFallbackEligible(error: WebSummaryError): boolean {
+	if (error.code === "E11" || error.code === "E10") return false;
+	if (error.code === "E12") return true;
+	if (error.code === "E13") {
+		const detail = error.message.toLowerCase();
+		return /high demand|unavailable|overloaded|try again later|503|temporarily/i.test(
+			detail,
+		);
+	}
+	return false;
+}
+
+async function generateWithModel(
+	model: string,
+	opts: {
+		apiKey: string;
+		systemInstruction: string;
+		userPrompt: string;
+		maxOutputTokens: number;
+		signal?: AbortSignal;
+	},
+	maxAttempts: number,
+): Promise<{ text: string; model: string }> {
+	const { apiKey, systemInstruction, userPrompt, maxOutputTokens, signal } =
+		opts;
+	let lastError: WebSummaryError | undefined;
+	const url = `${GEMINI_REST}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		throwIfAborted(signal);
+		try {
+			const res = await fetch(url, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				signal,
+				body: JSON.stringify({
+					systemInstruction: {
+						parts: [{ text: systemInstruction }],
+					},
+					contents: [
+						{
+							role: "user",
+							parts: [{ text: userPrompt }],
+						},
+					],
+					generationConfig: {
+						maxOutputTokens,
+						temperature: 0.35,
+						responseMimeType: "application/json",
+						responseSchema: GEMINI_SUMMARY_RESPONSE_SCHEMA,
+					},
+				}),
+			});
+
+			const data = (await res.json()) as Record<string, unknown>;
+
+			const errObj = data?.error as GeminiErrBody | undefined;
+
+			if (!res.ok || errObj?.message) {
+				const msg = errObj?.message ?? `HTTP ${res.status}`;
+				lastError = webSummaryErrorFromGeminiResponse(
+					res.status,
+					errObj,
+					msg,
+				);
+
+				if (lastError.code === "E12") {
+					const wait = parseRetryAfterMs(msg);
+					if (wait != null && attempt < maxAttempts - 1) {
+						await sleepMs(wait, signal);
+						continue;
+					}
+				}
+				break;
+			}
+
+			const text = extractGeminiText(data);
+			if (text) {
+				return { text, model };
+			}
+
+			const reason = (
+				data?.candidates as Array<{ finishReason?: string }>
+			)?.[0]?.finishReason;
+			lastError = new WebSummaryError(
+				"E13",
+				reason ? `empty_candidate:${reason}` : "empty_response",
+			);
+			break;
+		} catch (e: unknown) {
+			if (
+				signal?.aborted ||
+				(e instanceof DOMException && e.name === "AbortError")
+			) {
+				throw e instanceof Error
+					? e
+					: new DOMException("Aborted", "AbortError");
+			}
+			lastError = new WebSummaryError(
+				"E13",
+				e instanceof Error ? e.message : String(e),
+			);
+			break;
+		}
+	}
+
+	throw lastError ?? new WebSummaryError("E13", "request_failed");
+}
 
 export async function summarizeWithGemini(opts: {
 	apiKey: string;
 	systemInstruction: string;
 	userPrompt: string;
 	maxOutputTokens: number;
+	signal?: AbortSignal;
 }): Promise<{ text: string; model: string }> {
-	const { apiKey, systemInstruction, userPrompt, maxOutputTokens } = opts;
-	const models = [...new Set(GEMINI_MODEL_DEFAULTS)];
-	let lastError: WebSummaryError | undefined;
-
-	for (const model of models) {
-		const url = `${GEMINI_REST}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-		for (let attempt = 0; attempt < 3; attempt++) {
-			try {
-				const res = await fetch(url, {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						systemInstruction: {
-							parts: [{ text: systemInstruction }],
-						},
-						contents: [
-							{
-								role: "user",
-								parts: [{ text: userPrompt }],
-							},
-						],
-						generationConfig: {
-							maxOutputTokens,
-							temperature: 0.35,
-							responseMimeType: "application/json",
-							responseSchema: GEMINI_SUMMARY_RESPONSE_SCHEMA,
-						},
-					}),
-				});
-
-				const data = (await res.json()) as Record<string, unknown>;
-
-				const errObj = data?.error as
-					| { message?: string; code?: number; status?: string }
-					| undefined;
-
-				if (!res.ok || errObj?.message) {
-					const msg = errObj?.message ?? `HTTP ${res.status}`;
-					lastError = webSummaryErrorFromGeminiResponse(
-						res.status,
-						errObj,
-						msg,
-					);
-
-					if (lastError.code === "E12") {
-						const wait = parseRetryAfterMs(msg);
-						if (wait != null && attempt < 2) {
-							await sleepMs(wait);
-							continue;
-						}
-					}
-					break;
-				}
-
-				const text = extractGeminiText(data);
-				if (text) {
-					return { text, model };
-				}
-
-				const reason = (
-					data?.candidates as Array<{ finishReason?: string }>
-				)?.[0]?.finishReason;
-				lastError = new WebSummaryError(
-					"E13",
-					reason ? `empty_candidate:${reason}` : "empty_response",
-				);
-				break;
-			} catch (e: unknown) {
-				lastError = new WebSummaryError(
-					"E13",
-					e instanceof Error ? e.message : String(e),
-				);
-				break;
-			}
+	try {
+		return await generateWithModel(
+			GEMINI_MODEL,
+			opts,
+			PRIMARY_MAX_ATTEMPTS,
+		);
+	} catch (error) {
+		if (error instanceof WebSummaryError && isFallbackEligible(error)) {
+			return generateWithModel(
+				GEMINI_MODEL_FALLBACK,
+				opts,
+				FALLBACK_MAX_ATTEMPTS,
+			);
 		}
+		throw error;
 	}
-
-	throw lastError ?? new WebSummaryError("E13", "all_models_exhausted");
 }
 
 function normalizeIncomingArticle(text: string): string {
@@ -159,7 +236,6 @@ export type SummaryResult = {
 	readReason: string;
 	title: string;
 	briefLines: string[];
-	fullSummary: string;
 	stats: {
 		originalLength: number;
 		model: string;
@@ -167,6 +243,7 @@ export type SummaryResult = {
 		approxInputTokensHint: number;
 		maxOutputTokensCap: number;
 		source: "extension";
+		dietWasCompressed: boolean;
 	};
 };
 
@@ -176,14 +253,16 @@ export async function summarizeArticle(input: {
 	language: ServiceLang;
 	articleTitle?: string;
 	articleText: string;
+	signal?: AbortSignal;
 }): Promise<SummaryResult> {
-	const { apiKey, language, articleTitle, articleText } = input;
+	const { apiKey, language, articleTitle, articleText, signal } = input;
 	const L = langTag(language);
 
-	const normalized = normalizeIncomingArticle(articleText).slice(
-		0,
-		MAX_INPUT_CHARS,
-	);
+	const normalized = normalizeIncomingArticle(articleText);
+	const { text: dieted, stats: dietStats } = applyTokenDiet(normalized, {
+		maxChars: MAX_INPUT_CHARS,
+		locale: articleLocaleFromServiceLang(language),
+	});
 	const scrapedTitle = pickSummaryDisplayTitle(
 		articleTitle?.trim() || "",
 		language,
@@ -192,7 +271,7 @@ export async function summarizeArticle(input: {
 	const userPrompt = buildLeanPrompt({
 		language,
 		title: scrapedTitle,
-		content: normalized,
+		content: dieted,
 	});
 	const systemInstruction = buildSystemInstructionForLang(L);
 
@@ -200,11 +279,13 @@ export async function summarizeArticle(input: {
 	let model = "";
 
 	for (let attempt = 0; attempt < SUMMARY_PARSE_MAX_ATTEMPTS; attempt++) {
+		throwIfAborted(signal);
 		const result = await summarizeWithGemini({
 			apiKey,
 			systemInstruction,
 			userPrompt,
 			maxOutputTokens: MAX_OUTPUT_TOKENS,
+			signal,
 		});
 		model = result.model;
 
@@ -220,10 +301,11 @@ export async function summarizeArticle(input: {
 				stats: {
 					originalLength: articleText.length,
 					model,
-					sentToModelChars: normalized.length,
-					approxInputTokensHint: Math.ceil(normalized.length / 4),
+					sentToModelChars: dieted.length,
+					approxInputTokensHint: Math.ceil(dieted.length / 4),
 					maxOutputTokensCap: MAX_OUTPUT_TOKENS,
 					source: "extension",
+					dietWasCompressed: dietStats.afterSelect < dietStats.originalChars,
 				},
 			};
 		} catch (err) {
@@ -233,7 +315,7 @@ export async function summarizeArticle(input: {
 				attempt < SUMMARY_PARSE_MAX_ATTEMPTS - 1
 			) {
 				lastParseError = err;
-				await sleepMs(400);
+				await sleepMs(400, signal);
 				continue;
 			}
 			throw err;

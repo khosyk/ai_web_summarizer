@@ -62,4 +62,12 @@ describe('buildSystemInstructionForLang', () => {
   it('requests Simplified Chinese output when L is zh', () => {
     expect(buildSystemInstructionForLang('zh')).toContain('Simplified Chinese');
   });
+
+  it('assigns editor role and one-sentence briefLines rules', () => {
+    const instruction = buildSystemInstructionForLang('en');
+    expect(instruction).toContain('reading-triage editor');
+    expect(instruction).toContain('briefLines');
+    expect(instruction).toContain('exactly one sentence');
+    expect(instruction).not.toContain('fullSummary');
+  });
 });
