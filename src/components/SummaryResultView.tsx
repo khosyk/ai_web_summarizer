@@ -1,13 +1,7 @@
 import { useState } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
-import {
-	AlignLeft,
-	BookOpen,
-	Copy,
-	FileText,
-	XCircle,
-} from "lucide-react";
+import { AlignLeft, BookOpen, Copy, XCircle } from "lucide-react";
 import type { ReadRecommendation } from "../summaryStructured";
 
 const MARKDOWN_INLINE = {
@@ -28,38 +22,10 @@ const MARKDOWN_INLINE = {
 	),
 } as const;
 
-type SectionId = "brief" | "full";
-
-type SectionUi = {
-	icon: typeof AlignLeft;
-	accent: string;
-	chip: string;
-	border: string;
-	bg: string;
-};
-
-const SECTION_UI: Record<SectionId, SectionUi> = {
-	brief: {
-		icon: AlignLeft,
-		accent: "text-indigo-700",
-		chip: "bg-indigo-600 text-white",
-		border: "border-indigo-200/80",
-		bg: "bg-gradient-to-br from-indigo-50/90 via-white to-white",
-	},
-	full: {
-		icon: FileText,
-		accent: "text-violet-800",
-		chip: "bg-violet-600 text-white",
-		border: "border-violet-200/70",
-		bg: "bg-gradient-to-br from-violet-50/40 via-white to-slate-50/30",
-	},
-};
-
 const COPY: Record<
 	string,
 	{
 		brief: string;
-		full: string;
 		verdictRead: string;
 		verdictSkip: string;
 		verdictLabel: string;
@@ -68,7 +34,6 @@ const COPY: Record<
 > = {
 	English: {
 		brief: "Three-line summary",
-		full: "Full summary",
 		verdictRead: "Worth reading",
 		verdictSkip: "Skip for now",
 		verdictLabel: "Read?",
@@ -76,7 +41,6 @@ const COPY: Record<
 	},
 	Korean: {
 		brief: "세 줄 요약",
-		full: "전체 요약",
 		verdictRead: "읽을 가치 있음",
 		verdictSkip: "지금은 건너뛰기",
 		verdictLabel: "읽을까?",
@@ -84,7 +48,6 @@ const COPY: Record<
 	},
 	Chinese: {
 		brief: "三行摘要",
-		full: "全文摘要",
 		verdictRead: "值得读",
 		verdictSkip: "可跳过",
 		verdictLabel: "要读吗",
@@ -101,7 +64,6 @@ function buildCopyText(
 	readReason: string,
 	title: string,
 	briefLines: string[],
-	fullSummary: string,
 	language: string,
 ): string {
 	const labels = uiCopy(language);
@@ -110,9 +72,7 @@ function buildCopyText(
 			? labels.verdictRead
 			: labels.verdictSkip;
 	const brief = briefLines.map((line, i) => `${i + 1}. ${line}`).join("\n");
-	return [`${verdictLine}: ${readReason}`, title, "", brief, "", fullSummary].join(
-		"\n",
-	);
+	return [`${verdictLine}: ${readReason}`, title, "", brief].join("\n");
 }
 
 function VerdictCard({
@@ -174,91 +134,22 @@ function VerdictCard({
 	);
 }
 
-function SectionCard({
-	id,
-	language,
-	index,
-	briefLines,
-	fullSummary,
-}: {
-	id: SectionId;
-	language: string;
-	index: number;
-	briefLines: string[];
-	fullSummary: string;
-}) {
-	const labels = uiCopy(language);
-	const ui = SECTION_UI[id];
-	const Icon = ui.icon;
-	const title = id === "brief" ? labels.brief : labels.full;
-
-	return (
-		<section
-			className={`rounded-2xl border ${ui.border} ${ui.bg} p-4 shadow-sm`}
-		>
-			<div className="mb-3 flex items-center gap-2.5">
-				<span
-					className={`flex h-8 w-8 items-center justify-center rounded-xl ${ui.chip} shadow-sm`}
-				>
-					<Icon size={15} strokeWidth={2.25} />
-				</span>
-				<p
-					className={`min-w-0 flex-1 text-[10px] font-black uppercase tracking-[0.14em] ${ui.accent}`}
-				>
-					{index + 1} · {title}
-				</p>
-			</div>
-
-			{id === "brief" ? (
-				<ul className="space-y-2.5">
-					{briefLines.map((line, i) => (
-						<li
-							key={i}
-							className="flex gap-3 rounded-xl border border-indigo-100/90 bg-white/80 px-3 py-2.5 text-[12px] font-medium leading-snug text-slate-700 shadow-sm"
-						>
-							<span
-								className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-[10px] font-black text-indigo-700"
-								aria-hidden
-							>
-								{i + 1}
-							</span>
-							<span className="min-w-0 flex-1">
-								<ReactMarkdown components={MARKDOWN_INLINE}>
-									{line}
-								</ReactMarkdown>
-							</span>
-						</li>
-					))}
-				</ul>
-			) : (
-				<div className="rounded-xl border border-white/80 bg-white/70 px-3.5 py-3 text-[13px] text-slate-700">
-					<ReactMarkdown components={MARKDOWN_INLINE}>
-						{fullSummary}
-					</ReactMarkdown>
-				</div>
-			)}
-		</section>
-	);
-}
-
 type Props = {
 	readRecommendation: ReadRecommendation;
 	readReason: string;
 	title: string;
 	briefLines: string[];
-	fullSummary: string;
 	language: string;
 	copyLabel: string;
 	copiedLabel: string;
 };
 
-/** 읽기 판단 + 세줄 요약 + 전체 요약 */
+/** 읽기 판단 + 제목 + 세 줄 요약 */
 export function SummaryResultView({
 	readRecommendation,
 	readReason,
 	title,
 	briefLines,
-	fullSummary,
 	language,
 	copyLabel,
 	copiedLabel,
@@ -272,7 +163,6 @@ export function SummaryResultView({
 			readReason,
 			title,
 			briefLines,
-			fullSummary,
 			language,
 		);
 		await navigator.clipboard.writeText(text);
@@ -309,22 +199,36 @@ export function SummaryResultView({
 				</div>
 			</header>
 
-			<div className="grid gap-3">
-				<SectionCard
-					id="brief"
-					language={language}
-					index={0}
-					briefLines={briefLines}
-					fullSummary={fullSummary}
-				/>
-				<SectionCard
-					id="full"
-					language={language}
-					index={1}
-					briefLines={briefLines}
-					fullSummary={fullSummary}
-				/>
-			</div>
+			<section className="rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/90 via-white to-white p-4 shadow-sm">
+				<div className="mb-3 flex items-center gap-2.5">
+					<span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+						<AlignLeft size={15} strokeWidth={2.25} />
+					</span>
+					<p className="min-w-0 flex-1 text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">
+						{labels.brief}
+					</p>
+				</div>
+				<ul className="space-y-3">
+					{briefLines.map((line, i) => (
+						<li
+							key={i}
+							className="flex gap-3 rounded-xl border border-indigo-100/90 bg-white/80 px-3 py-2.5 text-[12px] font-medium leading-snug text-slate-700 shadow-sm"
+						>
+							<span
+								className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-[10px] font-black text-indigo-700"
+								aria-hidden
+							>
+								{i + 1}
+							</span>
+							<span className="min-w-0 flex-1">
+								<ReactMarkdown components={MARKDOWN_INLINE}>
+									{line}
+								</ReactMarkdown>
+							</span>
+						</li>
+					))}
+				</ul>
+			</section>
 		</div>
 	);
 }

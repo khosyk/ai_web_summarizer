@@ -7,8 +7,11 @@ const validPayload = {
 	readReason:
 		"The article covers policy changes not obvious from the headline.",
 	title: "New export rules explained",
-	briefLines: ["Line one.", "Line two.", "Line three."],
-	fullSummary: "Full summary body with enough detail.",
+	briefLines: [
+		"Line one with enough detail.",
+		"Line two with context.",
+		"Line three with takeaway.",
+	],
 };
 
 describe("parseStructuredSummary", () => {
@@ -23,7 +26,6 @@ describe("parseStructuredSummary", () => {
 		expect(result.readReason).toBe(validPayload.readReason);
 		expect(result.title).toBe(validPayload.title);
 		expect(result.briefLines).toEqual(validPayload.briefLines);
-		expect(result.fullSummary).toBe(validPayload.fullSummary);
 	});
 
 	it("strips markdown code fences before parsing", () => {
