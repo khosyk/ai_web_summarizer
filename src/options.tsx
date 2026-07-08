@@ -1,8 +1,10 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ApiKeyForm } from './components/ApiKeyForm';
+import { AutoBlocklistForm } from './components/AutoBlocklistForm';
 import { detectServiceLang } from './detectServiceLang';
-import type { ServiceLang } from './privacyNotice';
+import { LEGAL_LINK, type ServiceLang } from './privacyNotice';
+import { openLegalPage } from './openLegalPage';
 import { getUiLanguage, UI_LANGUAGE_STORAGE_KEY } from './uiLanguageStorage';
 import { isServiceLang } from './supportedLanguages';
 import { PRODUCT_DISPLAY_NAME } from './productBrand';
@@ -58,6 +60,16 @@ function OptionsPage() {
         </div>
 
         <ApiKeyForm language={language} />
+
+        <AutoBlocklistForm language={language} />
+
+        <button
+          type="button"
+          onClick={openLegalPage}
+          className="text-[11px] font-black text-indigo-600 underline hover:text-indigo-700"
+        >
+          {LEGAL_LINK[language]}
+        </button>
       </div>
     </div>
   );

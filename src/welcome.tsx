@@ -33,6 +33,7 @@ type WelcomeCopy = {
 	subtitleSetup: string;
 	subtitleBenefit: string;
 	subtitleFootnote: string;
+	complianceNotice: string;
 	setupLabel: string;
 	footer: string;
 	step0Title: string;
@@ -66,6 +67,8 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 			"Open the side panel and set up your Gemini API key just once.",
 		subtitleBenefit: "Find what matters fast and close the tabs you can skip.",
 		subtitleFootnote: "*Your API key is never sent outside your browser.",
+		complianceNotice:
+			"BYOK: you accept Google’s Gemini API terms when you create your key. Unpaid (free) tier data may be used by Google to improve products. In the EEA, UK, or Switzerland, use a billing-enabled (Paid) project per Google’s terms. Summaries may include translation when UI language differs from the article—personal triage only; include the source URL when sharing.",
 		setupLabel: "Setup · 5 steps",
 		footer:
 			"You can close this tab after setup. Reopen Settings anytime from the side panel.",
@@ -124,25 +127,27 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		subtitleBenefit:
 			"중요한 글은 빠르게 찾고, 불필요한 탭은 바로 걸러낼 수 있습니다.",
 		subtitleFootnote: "*API 키는 브라우저 밖으로 전송되지 않습니다.",
+		complianceNotice:
+			"BYOK: 키 생성 시 Google Gemini API 약관에 동의합니다. 무료(Unpaid) tier는 Google이 API 데이터를 제품 개선에 활용할 수 있습니다. EEA·영국·스위스는 Google 약관상 billing 연결(Paid) 프로젝트를 권장합니다. UI 언어와 기사 언어가 다르면 번역된 요약이 나올 수 있습니다—개인 triage 전용이며, 공유 시 출처 URL을 함께 표기하세요.",
 		setupLabel: "설정 · 5단계",
 		footer:
 			"설정 후 이 탭을 닫아도 됩니다. 사이드패널에서 언제든 설정을 다시 열 수 있습니다.",
 		step0Title: "1. 사이드패널 열기",
 		step0Desc:
-			"Web Summary는 이 탭이 아니라 Chrome 사이드패널에서 실행됩니다. 아래 버튼으로 여세요.",
+			"Web Summary는 이 탭이 아니라 Chrome 사이드패널에서 실행됩니다. 아래 버튼으로 열어 주세요.",
 		step0Btn: "지금 사이드패널 열기",
 		step1Title: "2. Gemini API 키 받기",
 		step1Desc: "Google AI Studio에서 무료 키를 만드세요.",
 		step1Btn: "API 키 페이지 열기 →",
 		step2Title: "3. 설정에 키 저장",
-		step2Desc: "확장 설정(Options)을 열고 키를 붙여넣은 뒤 저장을 누르세요.",
+		step2Desc: "확장 프로그램 설정(Options)을 열고 키를 붙여넣은 뒤 저장을 누르세요.",
 		step2Btn: "설정 열기",
 		step2Figcaption:
-			"복사한 키를 붙여넣고 Save를 누른 뒤 사이드패널로 돌아가세요.",
+			"복사한 키를 붙여넣고 저장을 누른 뒤 사이드패널로 돌아가세요.",
 		step2Image: "guide-step-4-paste-settings.png",
 		step3Title: "4. 기사 탭 요약하기",
 		step3Desc:
-			"사이드패널을 연 채 http(s) 기사 탭으로 이동해 Summarize this tab을 누르세요. 읽기/건너뛰기, 제목, 한 문장씩 세 줄 요약이 표시됩니다.",
+			"사이드패널을 연 채 http(s) 기사 탭으로 이동해 「현재 탭 요약하기」를 누르세요. 읽기/건너뛰기 판정, 제목, 한 문장씩 세 줄 요약이 표시됩니다. Auto를 켜 두면 탭에서 잠시 머물 때 자동으로 요약됩니다.",
 		stepQnaTitle: "5. Q&A",
 		stepQnaDesc:
 			"API 키, 무료 한도, 개인정보, 오류에 대한 자주 묻는 질문. 질문을 눌러 펼치세요.",
@@ -156,9 +161,9 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 					"API 키를 만들려면 Google 계정 로그인이 필요합니다. 로그인 화면이 나오면 계정으로 로그인하세요.",
 			},
 			{
-				title: "Create API key 클릭",
+				title: "「Create API key」 클릭",
 				caption:
-					"Google AI Studio → API Key에서 오른쪽 위 Create API key를 클릭하세요.",
+					"Google AI Studio → API Key 화면에서 오른쪽 위 「Create API key」를 클릭하세요.",
 				image: "guide-step-1-api-page.png",
 			},
 			{
@@ -180,6 +185,8 @@ const TRANSLATIONS: Record<ServiceLang, WelcomeCopy> = {
 		subtitleSetup: "打开侧边栏，只需设置一次 Gemini API 密钥。",
 		subtitleBenefit: "快速找到值得读的文章，立刻筛掉不必要的标签页。",
 		subtitleFootnote: "*API 密钥不会发送到浏览器之外。",
+		complianceNotice:
+			"BYOK：创建密钥即表示接受 Google Gemini API 条款。免费（Unpaid）额度下 Google 可能将 API 数据用于产品改进。位于 EEA、英国或瑞士时，请按 Google 条款使用已启用 billing 的（Paid）项目。界面语言与文章不同时可能含翻译——仅供个人浏览判断；分享时请附上来源 URL。",
 		setupLabel: "设置 · 5 步",
 		footer: "设置完成后可关闭此标签。随时可从侧边栏打开设置。",
 		step0Title: "1. 打开侧边栏",
@@ -460,6 +467,9 @@ function WelcomePage() {
 						<p className="text-[10px] leading-relaxed text-slate-400">
 							{T.subtitleFootnote}
 						</p>
+					</div>
+					<div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[11px] leading-relaxed text-amber-900">
+						{T.complianceNotice}
 					</div>
 				</header>
 

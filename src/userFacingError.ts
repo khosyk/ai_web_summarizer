@@ -53,7 +53,7 @@ const USER_COPY: Record<ErrorCode, { en: string; ko: string; zh: string }> = {
   },
   E10: {
     en: "We couldn't complete the summary. Please tap Summarize again.",
-    ko: '요약을 완료하지 못했습니다. 다시 Summarize를 눌러 주세요.',
+    ko: '요약을 완료하지 못했습니다. 다시 「현재 탭 요약하기」를 눌러 주세요.',
     zh: '暂时无法完成摘要，请再试一次。',
   },
   E11: {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
-import { AlignLeft, BookOpen, Copy, XCircle } from "lucide-react";
+import { AlignLeft, BookOpen, Copy, ExternalLink, XCircle } from "lucide-react";
 import type { ReadRecommendation } from "../summaryStructured";
 
 const MARKDOWN_INLINE = {
@@ -30,6 +30,8 @@ const COPY: Record<
 		verdictSkip: string;
 		verdictLabel: string;
 		headline: string;
+		aiGenerated: string;
+		source: string;
 	}
 > = {
 	English: {
@@ -38,6 +40,8 @@ const COPY: Record<
 		verdictSkip: "Skip for now",
 		verdictLabel: "Read?",
 		headline: "Headline",
+		aiGenerated: "AI-generated · verify before sharing",
+		source: "Source",
 	},
 	Korean: {
 		brief: "세 줄 요약",
@@ -45,13 +49,17 @@ const COPY: Record<
 		verdictSkip: "지금은 건너뛰기",
 		verdictLabel: "읽을까?",
 		headline: "제목",
+		aiGenerated: "AI 생성 · 공유 전 직접 확인",
+		source: "출처",
 	},
 	Chinese: {
 		brief: "三行摘要",
 		verdictRead: "值得读",
 		verdictSkip: "可跳过",
-		verdictLabel: "要读吗",
+		verdictLabel: "要读吗？",
 		headline: "摘要标题",
+		aiGenerated: "AI 生成 · 分享前请自行核实",
+		source: "来源",
 	},
 };
 
@@ -64,6 +72,7 @@ function buildCopyText(
 	readReason: string,
 	title: string,
 	briefLines: string[],
+	sourceTabUrl: string,
 	language: string,
 ): string {
 	const labels = uiCopy(language);
@@ -72,7 +81,14 @@ function buildCopyText(
 			? labels.verdictRead
 			: labels.verdictSkip;
 	const brief = briefLines.map((line, i) => `${i + 1}. ${line}`).join("\n");
-	return [`${verdictLine}: ${readReason}`, title, "", brief].join("\n");
+	return [
+		labels.aiGenerated,
+		`${labels.source}: ${sourceTabUrl}`,
+		`${verdictLine}: ${readReason}`,
+		title,
+		"",
+		brief,
+	].join("\n");
 }
 
 function VerdictCard({
@@ -139,6 +155,7 @@ type Props = {
 	readReason: string;
 	title: string;
 	briefLines: string[];
+	sourceTabUrl: string;
 	language: string;
 	copyLabel: string;
 	copiedLabel: string;
@@ -150,6 +167,7 @@ export function SummaryResultView({
 	readReason,
 	title,
 	briefLines,
+	sourceTabUrl,
 	language,
 	copyLabel,
 	copiedLabel,
@@ -163,6 +181,7 @@ export function SummaryResultView({
 			readReason,
 			title,
 			briefLines,
+			sourceTabUrl,
 			language,
 		);
 		await navigator.clipboard.writeText(text);
@@ -229,6 +248,27 @@ export function SummaryResultView({
 					))}
 				</ul>
 			</section>
+
+			{sourceTabUrl ? (
+				<p className="flex items-start gap-1.5 px-0.5 text-[10px] leading-snug text-slate-500">
+					<ExternalLink
+						size={11}
+						className="mt-0.5 shrink-0 text-slate-400"
+						aria-hidden
+					/>
+					<span className="min-w-0">
+						<span className="font-bold text-slate-600">{labels.source}: </span>
+						<a
+							href={sourceTabUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="break-all font-medium text-indigo-600 underline hover:text-indigo-800"
+						>
+							{sourceTabUrl}
+						</a>
+					</span>
+				</p>
+			) : null}
 		</div>
 	);
 }

@@ -20,6 +20,7 @@ import {
 	FIRST_SUMMARY_COMPLETED_STORAGE_KEY,
 } from "./uiLanguageStorage";
 import type { ServiceLang } from "./privacyNotice";
+import { LEGAL_LINK } from "./privacyNotice";
 import { summarizeArticle } from "./geminiClient";
 import { isServiceLang } from "./supportedLanguages";
 import {
@@ -27,8 +28,16 @@ import {
 	resolveUserFacingError,
 	WebSummaryError,
 } from "./userFacingError";
-import { extensionIconUrl } from "./openLegalPage";
+import { extensionIconUrl, openLegalPage } from "./openLegalPage";
 import { PRODUCT_DISPLAY_NAME } from "./productBrand";
+import {
+	addAutoSummarizeBlockedHost,
+	AUTO_SUMMARIZE_BLOCKED_HOSTS_KEY,
+	getAutoSummarizeBlockedHosts,
+	hostFromTabUrl,
+	isHostBlocked,
+	isTabUrlAutoBlocked,
+} from "./autoSummarizeBlocklist";
 
 function isChromeExtension(): boolean {
 	return typeof chrome !== "undefined" && Boolean(chrome.runtime?.id);
@@ -66,6 +75,10 @@ type UiCopy = {
 	readyEmptyAutoNote: string;
 	copySummary: string;
 	copiedSummary: string;
+	autoComplianceNote: string;
+	blockAutoForSiteBtn: string;
+	blockAutoForSiteDone: string;
+	blockAutoForSiteAlready: string;
 };
 
 type AppSummaryResult = {
@@ -90,7 +103,8 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 		title: PRODUCT_DISPLAY_NAME,
 		analyzeBtn: "Summarize this tab",
 		languageChange: "Change language",
-		emptyHint: "Open an article tab and tap Summarize this tab",
+		emptyHint:
+			"Open an article tab and tap Summarize this tab. AI-generated — verify before sharing.",
 		errDialogTitle: "Something went wrong",
 		errDialogClose: "OK",
 		statsSource: "Source",
@@ -116,12 +130,18 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 			"Auto is on — stay on an article tab for a few seconds to summarize automatically.",
 		copySummary: "Copy",
 		copiedSummary: "Copied",
+		autoComplianceNote:
+			"Auto extracts page text after ~3s—use only where site terms allow.",
+		blockAutoForSiteBtn: "Turn off Auto for this site",
+		blockAutoForSiteDone: "Auto off for {host}",
+		blockAutoForSiteAlready: "Auto already off for this site",
 	},
 	Korean: {
 		title: PRODUCT_DISPLAY_NAME,
 		analyzeBtn: "현재 탭 요약하기",
 		languageChange: "언어 변경",
-		emptyHint: "기사 탭에서 요약하기를 누르세요",
+		emptyHint:
+			"기사 탭을 연 뒤 「현재 탭 요약하기」를 누르세요. AI 생성 · 공유 전 직접 확인",
 		errDialogTitle: "문제가 발생했습니다",
 		errDialogClose: "확인",
 		statsSource: "출처",
@@ -147,12 +167,17 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 			"Auto가 켜져 있으면 기사 탭에서 잠시 머물면 자동으로 요약됩니다.",
 		copySummary: "복사",
 		copiedSummary: "복사됨",
+		autoComplianceNote:
+			"Auto는 약 3초 후 본문을 추출합니다. 사이트 약관이 허용하는 경우에만 사용하세요.",
+		blockAutoForSiteBtn: "이 사이트에서 Auto 끄기",
+		blockAutoForSiteDone: "{host}에서 Auto 꺼짐",
+		blockAutoForSiteAlready: "이 사이트는 이미 Auto 제외 목록에 있음",
 	},
 	Chinese: {
 		title: PRODUCT_DISPLAY_NAME,
 		analyzeBtn: "摘要当前标签",
 		languageChange: "更改语言",
-		emptyHint: "打开文章页后点击摘要当前标签",
+		emptyHint: "打开文章页后点击摘要当前标签。AI 生成 · 分享前请自行核实",
 		errDialogTitle: "出错了",
 		errDialogClose: "确定",
 		statsSource: "来源",
@@ -176,6 +201,10 @@ const TRANSLATIONS: Record<string, UiCopy> = {
 		readyEmptyAutoNote: "已开启 Auto — 在文章标签页停留几秒即可自动摘要。",
 		copySummary: "复制",
 		copiedSummary: "已复制",
+		autoComplianceNote: "Auto 约 3 秒后提取正文，请仅在网站条款允许时使用。",
+		blockAutoForSiteBtn: "此站点关闭 Auto",
+		blockAutoForSiteDone: "已关闭 {host} 的 Auto",
+		blockAutoForSiteAlready: "此站点已在排除列表中",
 	},
 };
 
@@ -351,6 +380,9 @@ export default function App() {
 	const [hasCompletedFirstSummary, setHasCompletedFirstSummaryState] =
 		useState<boolean | null>(null);
 	const [autoSummarizeEnabled, setAutoSummarizeEnabledState] = useState(false);
+	const [blockedHosts, setBlockedHosts] = useState<string[]>([]);
+	const [currentTabHost, setCurrentTabHost] = useState<string | null>(null);
+	const [blockSiteFeedback, setBlockSiteFeedback] = useState("");
 	const [result, setResult] = useState<AppSummaryResult | null>(null);
 
 	const [loadingPhaseIdx, setLoadingPhaseIdx] = useState(0);
@@ -366,12 +398,14 @@ export default function App() {
 	const analysisRunIdRef = useRef(0);
 	const analysisAbortRef = useRef<AbortController | null>(null);
 	const autoSummarizeEnabledRef = useRef(autoSummarizeEnabled);
+	const blockedHostsRef = useRef(blockedHosts);
 	const hasApiKeyRef = useRef(hasApiKey);
 	const isProcessingRef = useRef(isProcessing);
 	const resultRef = useRef(result);
 	const languageRef = useRef(language);
 
 	autoSummarizeEnabledRef.current = autoSummarizeEnabled;
+	blockedHostsRef.current = blockedHosts;
 	hasApiKeyRef.current = hasApiKey;
 	isProcessingRef.current = isProcessing;
 	resultRef.current = result;
@@ -384,6 +418,18 @@ export default function App() {
 			window.clearTimeout(autoDwellTimerRef.current);
 			autoDwellTimerRef.current = null;
 		}
+	}, []);
+
+	const refreshActiveTabHost = useCallback(async () => {
+		if (!isChromeExtension()) {
+			setCurrentTabHost(null);
+			return;
+		}
+		const [tab] = await chrome.tabs.query({
+			active: true,
+			currentWindow: true,
+		});
+		setCurrentTabHost(hostFromTabUrl(tab?.url ?? ""));
 	}, []);
 
 	const showError = useCallback((error: unknown) => {
@@ -504,41 +550,60 @@ export default function App() {
 			return;
 		}
 
-		const generation = ++autoDwellGenerationRef.current;
-		autoDwellTimerRef.current = window.setTimeout(() => {
-			if (generation !== autoDwellGenerationRef.current) return;
-			if (!autoSummarizeEnabledRef.current || isProcessingRef.current) return;
+		void (async () => {
+			if (!isChromeExtension()) return;
 
-			void (async () => {
-				if (!isChromeExtension()) return;
+			const [tab] = await chrome.tabs.query({
+				active: true,
+				currentWindow: true,
+			});
+			const tabUrl = tab?.url ?? "";
+			const tabHost = hostFromTabUrl(tabUrl);
+			setCurrentTabHost(tabHost);
+			if (!tab?.id || !tabUrl.startsWith("http")) return;
+			if (isTabUrlAutoBlocked(tabUrl, blockedHostsRef.current)) return;
 
-				const [tab] = await chrome.tabs.query({
-					active: true,
-					currentWindow: true,
-				});
-				const tabUrl = tab?.url ?? "";
-				if (!tab?.id || !tabUrl.startsWith("http")) return;
+			const generation = ++autoDwellGenerationRef.current;
+			autoDwellTimerRef.current = window.setTimeout(() => {
+				if (generation !== autoDwellGenerationRef.current) return;
+				if (!autoSummarizeEnabledRef.current || isProcessingRef.current) return;
 
-				const currentResult = resultRef.current;
-				const currentLanguage = languageRef.current;
-				if (
-					currentResult &&
-					currentResult.sourceTabUrl === tabUrl &&
-					currentResult.summaryLanguage === currentLanguage
-				) {
-					return;
-				}
+				void (async () => {
+					if (!isChromeExtension()) return;
 
-				await runAnalysis("auto");
-			})();
-		}, AUTO_SUMMARIZE_DWELL_MS);
+					const [activeTab] = await chrome.tabs.query({
+						active: true,
+						currentWindow: true,
+					});
+					const activeUrl = activeTab?.url ?? "";
+					const activeHost = hostFromTabUrl(activeUrl);
+					setCurrentTabHost(activeHost);
+					if (!activeTab?.id || !activeUrl.startsWith("http")) return;
+					if (isTabUrlAutoBlocked(activeUrl, blockedHostsRef.current)) return;
+
+					const currentResult = resultRef.current;
+					const currentLanguage = languageRef.current;
+					if (
+						currentResult &&
+						currentResult.sourceTabUrl === activeUrl &&
+						currentResult.summaryLanguage === currentLanguage
+					) {
+						return;
+					}
+
+					await runAnalysis("auto");
+				})();
+			}, AUTO_SUMMARIZE_DWELL_MS);
+		})();
 	}, [clearAutoDwellTimer, runAnalysis]);
 
 	useEffect(() => {
 		void getUiLanguage().then(setLanguageState);
 		void getAutoSummarizeEnabled().then(setAutoSummarizeEnabledState);
 		void getHasCompletedFirstSummary().then(setHasCompletedFirstSummaryState);
-	}, []);
+		void getAutoSummarizeBlockedHosts().then(setBlockedHosts);
+		void refreshActiveTabHost();
+	}, [refreshActiveTabHost]);
 
 	useEffect(() => {
 		const syncApiKeyState = () => {
@@ -566,6 +631,14 @@ export default function App() {
 				setAutoSummarizeEnabledState(
 					changes[AUTO_SUMMARIZE_STORAGE_KEY].newValue === true,
 				);
+			}
+			if (AUTO_SUMMARIZE_BLOCKED_HOSTS_KEY in changes) {
+				const next = changes[AUTO_SUMMARIZE_BLOCKED_HOSTS_KEY].newValue;
+				if (Array.isArray(next)) {
+					setBlockedHosts(
+						next.filter((entry): entry is string => typeof entry === "string"),
+					);
+				}
 			}
 			if (FIRST_SUMMARY_COMPLETED_STORAGE_KEY in changes) {
 				setHasCompletedFirstSummaryState(
@@ -605,6 +678,28 @@ export default function App() {
 		}
 		setAutoSummarizeEnabledState(next);
 		void setAutoSummarizeEnabled(next);
+		if (next) {
+			void refreshActiveTabHost();
+		} else {
+			setBlockSiteFeedback("");
+		}
+	};
+
+	const handleBlockAutoForCurrentSite = () => {
+		if (!currentTabHost) return;
+		if (isHostBlocked(currentTabHost, blockedHosts)) {
+			setBlockSiteFeedback(T.blockAutoForSiteAlready);
+			window.setTimeout(() => setBlockSiteFeedback(""), 2200);
+			return;
+		}
+		clearAutoDwellTimer();
+		void addAutoSummarizeBlockedHost(currentTabHost).then((next) => {
+			setBlockedHosts(next);
+			setBlockSiteFeedback(
+				T.blockAutoForSiteDone.replace("{host}", currentTabHost),
+			);
+			window.setTimeout(() => setBlockSiteFeedback(""), 2200);
+		});
 	};
 
 	useEffect(() => {
@@ -625,13 +720,16 @@ export default function App() {
 	useEffect(() => {
 		if (!autoSummarizeEnabled || !isChromeExtension()) return;
 
-		const onTabContextChange = () => scheduleAutoSummarize();
+		const onTabContextChange = () => {
+			void refreshActiveTabHost();
+			scheduleAutoSummarize();
+		};
 		const onTabUpdated = (
 			_tabId: number,
 			changeInfo: { status?: string; url?: string },
 		) => {
 			if (changeInfo.status === "complete" || changeInfo.url) {
-				scheduleAutoSummarize();
+				onTabContextChange();
 			}
 		};
 
@@ -642,7 +740,12 @@ export default function App() {
 			chrome.tabs.onUpdated.removeListener(onTabUpdated);
 			clearAutoDwellTimer();
 		};
-	}, [autoSummarizeEnabled, scheduleAutoSummarize, clearAutoDwellTimer]);
+	}, [
+		autoSummarizeEnabled,
+		scheduleAutoSummarize,
+		clearAutoDwellTimer,
+		refreshActiveTabHost,
+	]);
 
 	useEffect(() => {
 		if (!isProcessing) {
@@ -679,6 +782,9 @@ export default function App() {
 	}, [isWaitingOnModel, language]);
 
 	const handleStartAnalysis = () => void runAnalysis("manual");
+
+	const isCurrentHostBlocked =
+		currentTabHost !== null && isHostBlocked(currentTabHost, blockedHosts);
 
 	return (
 		<div className="flex h-screen flex-col overflow-hidden bg-[#F8FAFC] font-sans text-[#1E293B]">
@@ -739,6 +845,26 @@ export default function App() {
 					</div>
 				) : null}
 
+				{autoSummarizeEnabled && currentTabHost ? (
+					<div className="space-y-1">
+						<button
+							type="button"
+							onClick={handleBlockAutoForCurrentSite}
+							disabled={isCurrentHostBlocked || isProcessing}
+							className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-black text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{isCurrentHostBlocked
+								? T.blockAutoForSiteAlready
+								: T.blockAutoForSiteBtn}
+						</button>
+						{blockSiteFeedback ? (
+							<p className="text-center text-[9px] font-semibold text-emerald-700">
+								{blockSiteFeedback}
+							</p>
+						) : null}
+					</div>
+				) : null}
+
 				<div className={`flex ${autoSummarizeEnabled ? "gap-0" : "gap-2"}`}>
 					<button
 						type="button"
@@ -778,6 +904,11 @@ export default function App() {
 						</span>
 					</button>
 				</div>
+				{autoSummarizeEnabled ? (
+					<p className="text-[9px] leading-snug text-slate-400">
+						{T.autoComplianceNote}
+					</p>
+				) : null}
 			</header>
 
 			<main className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30 p-4 custom-scrollbar">
@@ -885,6 +1016,7 @@ export default function App() {
 									readReason={result.readReason}
 									title={result.title}
 									briefLines={result.briefLines}
+									sourceTabUrl={result.sourceTabUrl}
 									language={language}
 									copyLabel={T.copySummary}
 									copiedLabel={T.copiedSummary}
@@ -970,9 +1102,9 @@ export default function App() {
 											) : null}
 										</div>
 									) : (
-										<h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+										<p className="max-w-[17rem] text-xs font-medium leading-relaxed text-slate-500">
 											{T.emptyHint}
-										</h3>
+										</p>
 									)}
 								</div>
 							)
@@ -980,6 +1112,16 @@ export default function App() {
 					</AnimatePresence>
 				</div>
 			</main>
+
+			<footer className="shrink-0 border-t border-slate-100 bg-white px-3 py-2 text-center">
+				<button
+					type="button"
+					onClick={openLegalPage}
+					className="text-[9px] font-bold text-slate-400 underline hover:text-indigo-600"
+				>
+					{LEGAL_LINK[language]}
+				</button>
+			</footer>
 
 			<ErrorDialog
 				isOpen={errorDialog.isOpen}
