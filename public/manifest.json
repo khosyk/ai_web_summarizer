@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "A · Web Summary",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Read or skip each tab—summarize with your Gemini API key (BYOK). Side panel, no server.",
   "permissions": ["sidePanel", "tabs", "activeTab", "scripting", "storage"],
   "host_permissions": [

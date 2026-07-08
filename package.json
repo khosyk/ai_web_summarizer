@@ -2,7 +2,7 @@
 	"name": "web-summary-extension",
 	"private": true,
 	"description": "Chrome extension: read/skip verdict + tab summaries with your Gemini API key (BYOK).",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
