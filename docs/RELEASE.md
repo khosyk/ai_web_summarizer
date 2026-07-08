@@ -59,7 +59,7 @@ Dashboard     → Submit / Publish (수동, upload 모드)
 
 공식: [Use the Chrome Web Store API](https://developer.chrome.com/docs/webstore/using-api)
 
-1. Google Cloud: **Chrome Web Store API** Enable, OAuth **Web application** (Chrome Extension 타입 아님)
+1. Google Cloud: **Chrome Web Store API** Enable (**OAuth client와 같은 프로젝트** — 미활성 시 CI upload 403), OAuth **Web application** (Chrome Extension 타입 아님)
 2. OAuth **External** + **Testing**, **Test users**에 CWS 소유 Gmail
 3. Redirect URI: `https://developers.google.com/oauthplayground`
 4. [OAuth Playground](https://developers.google.com/oauthplayground): scope `https://www.googleapis.com/auth/chromewebstore` → **refresh_token** 발급 (CWS 소유 계정으로 Authorize)
