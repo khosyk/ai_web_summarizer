@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { getGeminiApiKey, setGeminiApiKey } from '../apiKeyStorage';
 import type { ServiceLang } from '../privacyNotice';
+import { LEGAL_LINK } from '../privacyNotice';
+import { openLegalPage } from '../openLegalPage';
 
 const API_KEY_URL = 'https://aistudio.google.com/apikey';
 
@@ -21,6 +23,7 @@ type FormCopy = {
   getKeyPrompt: string;
   getKeyBtn: string;
   getKeyNote: string;
+  termsNote: string;
   keyWherePrompt: string;
   keyPrivateLead: string;
   keyPrivateBody: string;
@@ -38,6 +41,8 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     getKeyPrompt: "Don't have a Gemini API key yet?",
     getKeyBtn: 'Get a key at Google AI Studio',
     getKeyNote: 'Summaries use your quota on the free or paid tier.',
+    termsNote:
+      'Creating a key means you accept Google’s Gemini API terms. Unpaid tier: Google may use API content for product improvement. EEA/UK/CH: billing-enabled (Paid) project recommended. See Legal & Privacy.',
     keyWherePrompt: 'Need help finding your key?',
     keyPrivateLead: 'Keep your key private.',
     keyPrivateBody:
@@ -54,6 +59,8 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     getKeyPrompt: '아직 Gemini API 키가 없나요?',
     getKeyBtn: 'Google AI Studio에서 키 받기',
     getKeyNote: '요약은 무료/유료 할당량을 사용합니다.',
+    termsNote:
+      '키 생성 시 Google Gemini API 약관에 동의합니다. 무료 tier: Google이 API 콘텐츠를 제품 개선에 활용할 수 있습니다. EEA·영국·스위스: billing 연결(Paid) 프로젝트 권장. 「법률 및 개인정보」 참고.',
     keyWherePrompt: '키를 찾는 데 도움이 필요하신가요?',
     keyPrivateLead: '키를 안전하게 보관하세요.',
     keyPrivateBody:
@@ -70,6 +77,8 @@ const TRANSLATIONS: Record<ServiceLang, FormCopy> = {
     getKeyPrompt: '还没有 Gemini API 密钥？',
     getKeyBtn: '在 Google AI Studio 获取密钥',
     getKeyNote: '摘要将消耗免费或付费配额。',
+    termsNote:
+      '创建密钥即表示接受 Google Gemini API 条款。免费额度：Google 可能将 API 内容用于产品改进。EEA/英国/瑞士：建议使用已启用 billing 的（Paid）项目。详见「法律与隐私」。',
     keyWherePrompt: '需要帮助查找密钥吗？',
     keyPrivateLead: '请妥善保管密钥。',
     keyPrivateBody: '持有此密钥的人可使用您的 Gemini 配额。仅在可信设备上使用「显示」。',
@@ -120,6 +129,7 @@ export function ApiKeyForm({ language }: Props) {
       <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-white to-white px-4 py-3.5 shadow-sm">
         <p className="text-sm font-black text-slate-900">{T.getKeyPrompt}</p>
         <p className="mt-1 text-xs leading-relaxed text-slate-600">{T.getKeyNote}</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{T.termsNote}</p>
         <a
           href={API_KEY_URL}
           target="_blank"
@@ -189,6 +199,14 @@ export function ApiKeyForm({ language }: Props) {
           {status}
         </p>
       ) : null}
+
+      <button
+        type="button"
+        onClick={openLegalPage}
+        className="text-[11px] font-bold text-indigo-600 underline hover:text-indigo-800"
+      >
+        {LEGAL_LINK[language]}
+      </button>
     </div>
   );
 }
