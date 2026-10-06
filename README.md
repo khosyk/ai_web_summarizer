@@ -9,12 +9,12 @@
 
 ## 왜 이 프로젝트인가
 
-| 문제 | 접근 |
-|------|------|
-| 탭·기사가 많아 **무엇부터 읽을지** 모호함 | **read/skip** + **3줄 요약**으로 triage |
+| 문제                                         | 접근                                               |
+| -------------------------------------------- | -------------------------------------------------- |
+| 탭·기사가 많아 **무엇부터 읽을지** 모호함    | **read/skip** + **3줄 요약**으로 triage            |
 | 클라우드 요약 SaaS는 키·비용·프라이버시 부담 | API 키 **로컬 저장**, 본문은 **브라우저 → Google** |
-| 긴 full summary는 느리고 토큰 소모가 큼 | **fullSummary 제거**, 짧은 structured JSON만 |
-| 뉴스 외 페이지·잡음(저작권, 구독 CTA) | **semantic root + token diet**로 입력 정제 |
+| 긴 full summary는 느리고 토큰 소모가 큼      | **fullSummary 제거**, 짧은 structured JSON만       |
+| 뉴스 외 페이지·잡음(저작권, 구독 CTA)        | **semantic root + token diet**로 입력 정제         |
 
 목표는 “전체 번역 요약기”가 아니라 **읽기 triage 도구**입니다.
 
@@ -55,20 +55,20 @@
 [사이드패널] App.tsx
     articleTokenDiet → summarizeArticle()
          ↓ fetch (매 요청 1 user turn, 세션 누적 없음)
-[Gemini] gemini-2.5-flash-lite (+ 조건부 flash fallback)
+[Gemini] gemini-3.5-flash-lite (+ 조건부 flash fallback)
          ↓ application/json + responseSchema
     parseStructuredSummary → SummaryResultView
 ```
 
-| 레이어 | 주요 파일 | 역할 |
-|--------|-----------|------|
-| 추출 | `content.ts`, `semanticRootPick.ts`, `readabilityMarkupToPlain.ts` | DOM → 본문 평문 |
-| 입력 다이어트 | `articleTokenDiet.ts` | locale별 잡음 제거·블록 선택, 최대 8k chars |
-| API | `geminiClient.ts`, `summaryPrompt.ts` | Gemini REST, structured output |
-| 파싱 | `summaryStructured.ts` | JSON → UI 모델 |
-| UI | `App.tsx`, `SummaryResultView.tsx`, `AutoBlocklistForm.tsx` | 패널·로딩·Auto·중지·제외 사이트 |
-| 설정 | `options.tsx`, `ApiKeyForm.tsx`, `autoSummarizeBlocklist.ts`, `uiLanguageStorage.ts` | 키·언어·Auto·블록리스트 |
-| SW | `background.ts` | 사이드패널 열기, install → welcome |
+| 레이어        | 주요 파일                                                                            | 역할                                        |
+| ------------- | ------------------------------------------------------------------------------------ | ------------------------------------------- |
+| 추출          | `content.ts`, `semanticRootPick.ts`, `readabilityMarkupToPlain.ts`                   | DOM → 본문 평문                             |
+| 입력 다이어트 | `articleTokenDiet.ts`                                                                | locale별 잡음 제거·블록 선택, 최대 8k chars |
+| API           | `geminiClient.ts`, `summaryPrompt.ts`                                                | Gemini REST, structured output              |
+| 파싱          | `summaryStructured.ts`                                                               | JSON → UI 모델                              |
+| UI            | `App.tsx`, `SummaryResultView.tsx`, `AutoBlocklistForm.tsx`                          | 패널·로딩·Auto·중지·제외 사이트             |
+| 설정          | `options.tsx`, `ApiKeyForm.tsx`, `autoSummarizeBlocklist.ts`, `uiLanguageStorage.ts` | 키·언어·Auto·블록리스트                     |
+| SW            | `background.ts`                                                                      | 사이드패널 열기, install → welcome          |
 
 **세션 누적 없음:** 매 `generateContent` 호출은 `contents: [{ role: "user", … }]` **1턴만** 보냅니다. 이전 요약이 다음 프롬프트에 붙지 않습니다. 토큰 사용량은 **(요청당 입력+출력) × 호출 횟수**입니다.
 
@@ -78,13 +78,13 @@
 
 ```typescript
 // geminiClient.ts
-MAX_INPUT_CHARS = 8000       // diet 적용 후 상한
-MAX_OUTPUT_TOKENS = 384        // 짧은 JSON (read/skip + 3 lines)
-GEMINI_MODEL = "gemini-2.5-flash-lite"
-GEMINI_MODEL_FALLBACK = "gemini-2.5-flash"   // E12·일부 E13만
-PRIMARY_MAX_ATTEMPTS = 3                     // lite 호출 (E12 retry-after 포함)
-FALLBACK_MAX_ATTEMPTS = 2                    // flash 호출
-SUMMARY_PARSE_MAX_ATTEMPTS = 3               // E10(JSON) 시 동일 프롬프트 재호출
+MAX_INPUT_CHARS = 8000; // diet 적용 후 상한
+MAX_OUTPUT_TOKENS = 384; // 짧은 JSON (read/skip + 3 lines)
+GEMINI_MODEL = "gemini-3.5-flash-lite";
+GEMINI_MODEL_FALLBACK = "gemini-3.5-flash"; // E12·일부 E13만
+PRIMARY_MAX_ATTEMPTS = 3; // lite 호출 (E12 retry-after 포함)
+FALLBACK_MAX_ATTEMPTS = 2; // flash 호출
+SUMMARY_PARSE_MAX_ATTEMPTS = 3; // E10(JSON) 시 동일 프롬프트 재호출
 ```
 
 - **모델 fallback:** E11(키 거부)·E10(JSON)에는 flash로 넘기지 않음. rate limit(E12)과 일시 장애(E13)만 flash 시도.
@@ -120,12 +120,12 @@ SUMMARY_PARSE_MAX_ATTEMPTS = 3               // E10(JSON) 시 동일 프롬프�
 
 ### 5. 속도·토큰 대응
 
-| 이슈 | 대응 |
-|------|------|
-| E10 truncated, 재시도로 수십 초 | **fullSummary 제거**, `MAX_OUTPUT` 384 |
-| 입력 8k 그대로 전송 | **`articleTokenDiet`** (locale별 잡음·블록 선택) |
-| Readability가 nav/잡음 포함 | **`semanticRootPick`** + root 내 noise strip |
-| 4모델 무조건 폴백 | **lite → flash 조건부**만 |
+| 이슈                            | 대응                                             |
+| ------------------------------- | ------------------------------------------------ |
+| E10 truncated, 재시도로 수십 초 | **fullSummary 제거**, `MAX_OUTPUT` 384           |
+| 입력 8k 그대로 전송             | **`articleTokenDiet`** (locale별 잡음·블록 선택) |
+| Readability가 nav/잡음 포함     | **`semanticRootPick`** + root 내 noise strip     |
+| 4모델 무조건 폴백               | **lite → flash 조건부**만                        |
 
 입력 상한 **8000** 확정 근거: [`docs/BENCHMARK.md`](docs/BENCHMARK.md) (2026-06-18 char-limit 실험).
 

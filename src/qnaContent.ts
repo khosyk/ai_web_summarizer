@@ -32,7 +32,7 @@ const QNA: Record<string, QnaCopy> = {
 				id: "free-tier",
 				question: "Is the API free? Any daily limits?",
 				answer:
-					"Google offers a free tier with per-project limits (requests per minute/day) that vary by model. This extension prefers gemini-2.5-flash-lite. Check usage in AI Studio if you see rate-limit errors.",
+					"Google offers a free tier with per-project limits (requests per minute/day) that vary by model. This extension prefers gemini-3.5-flash-lite. Check usage in AI Studio if you see rate-limit errors.",
 			},
 			{
 				id: "privacy",
@@ -103,7 +103,7 @@ const QNA: Record<string, QnaCopy> = {
 				id: "free-tier",
 				question: "API가 무료인가요? 일일 한도가 있나요?",
 				answer:
-					"Google은 프로젝트별 무료 한도(분당/일일 요청)를 제공하며 모델마다 다릅니다. 이 확장은 gemini-2.5-flash-lite를 우선 사용합니다. 한도 오류가 나면 AI Studio에서 사용량을 확인하세요.",
+					"Google은 프로젝트별 무료 한도(분당/일일 요청)를 제공하며 모델마다 다릅니다. 이 확장은 gemini-3.5-flash-lite를 우선 사용합니다. 한도 오류가 나면 AI Studio에서 사용량을 확인하세요.",
 			},
 			{
 				id: "privacy",
@@ -174,7 +174,7 @@ const QNA: Record<string, QnaCopy> = {
 				id: "free-tier",
 				question: "API 免费吗？有每日限制吗？",
 				answer:
-					"Google 提供免费额度，按项目限制每分钟/每日请求次数（因模型而异）。本扩展优先使用 gemini-2.5-flash-lite。若出现限流，请在 AI Studio 查看用量。",
+					"Google 提供免费额度，按项目限制每分钟/每日请求次数（因模型而异）。本扩展优先使用 gemini-3.5-flash-lite。若出现限流，请在 AI Studio 查看用量。",
 			},
 			{
 				id: "privacy",
