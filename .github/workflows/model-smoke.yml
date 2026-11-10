@@ -1,0 +1,39 @@
+name: Gemini model smoke test
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Require API key
+        env:
+          GEMINI_SMOKE_API_KEY: ${{ secrets.GEMINI_SMOKE_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_SMOKE_API_KEY" ]; then
+            echo "::error::Repository secret GEMINI_SMOKE_API_KEY is not set"
+            exit 1
+          fi
+
+      - name: Call each model
+        env:
+          GEMINI_SMOKE_API_KEY: ${{ secrets.GEMINI_SMOKE_API_KEY }}
+        run: yarn test:live

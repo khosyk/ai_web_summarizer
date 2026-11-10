@@ -32,13 +32,13 @@ const QNA: Record<string, QnaCopy> = {
 				id: "free-tier",
 				question: "Is the API free? Any daily limits?",
 				answer:
-					"Google offers a free tier with per-project limits (requests per minute/day) that vary by model. This extension prefers gemini-3.5-flash-lite. Check usage in AI Studio if you see rate-limit errors.",
+					"Google offers a free tier with per-project limits (requests per minute/day) that vary by model. This extension uses the latest Gemini Flash-Lite model. Check usage in AI Studio if you see rate-limit errors.",
 			},
 			{
 				id: "privacy",
 				question: "What data is stored?",
 				answer:
-					"No Web Summary backend server. Your API key (if saved), UI language, Auto toggle, and excluded domains list stay in chrome.storage.local on this device. Summaries are not persisted — only shown in the side panel.",
+					"No Web Summary backend server. Your API key (if saved), UI language, Auto toggle, excluded domains list, and summary history stay in chrome.storage.local on this device. Summary history includes page addresses and summaries, and you can turn it off or delete it in the side panel.",
 			},
 			{
 				id: "pages",
@@ -74,7 +74,7 @@ const QNA: Record<string, QnaCopy> = {
 				id: "errors",
 				question: "Too many requests or invalid key?",
 				answer:
-					"Invalid key (E11): fix it in Settings. Too many requests (E12): wait a minute or check AI Studio quota. Other errors: try another article page or Summarize again.",
+					"Invalid key (E11): fix it in Settings. Too many requests (E12): wait a minute or check AI Studio quota. Prepaid credits used up (E14): a new key on the same billing account will not help, so add credits in AI Studio (it may take a while to apply) or use a key from a project with no billing linked. That is the free tier: see the Gemini terms item for data use and EEA/UK/Swiss limits. Other errors: try another article page or Summarize again.",
 			},
 			{
 				id: "contact",
@@ -103,13 +103,13 @@ const QNA: Record<string, QnaCopy> = {
 				id: "free-tier",
 				question: "API가 무료인가요? 일일 한도가 있나요?",
 				answer:
-					"Google은 프로젝트별 무료 한도(분당/일일 요청)를 제공하며 모델마다 다릅니다. 이 확장은 gemini-3.5-flash-lite를 우선 사용합니다. 한도 오류가 나면 AI Studio에서 사용량을 확인하세요.",
+					"Google은 프로젝트별 무료 한도(분당/일일 요청)를 제공하며 모델마다 다릅니다. 이 확장은 최신 Gemini Flash-Lite 모델을 우선 사용합니다. 한도 오류가 나면 AI Studio에서 사용량을 확인하세요.",
 			},
 			{
 				id: "privacy",
 				question: "어떤 데이터가 저장되나요?",
 				answer:
-					"Web Summary 백엔드 서버는 없습니다. API 키(저장 시), UI 언어, Auto 요약 토글, Auto 제외 도메인 목록은 이 기기의 chrome.storage.local에만 있습니다. 요약은 저장되지 않고 사이드패널에만 표시됩니다.",
+					"Web Summary 백엔드 서버는 없습니다. API 키(저장 시), UI 언어, Auto 요약 토글, Auto 제외 도메인 목록, 요약 기록은 이 기기의 chrome.storage.local에만 있습니다. 요약 기록에는 페이지 주소와 요약이 들어 있고, 사이드패널에서 끄거나 삭제할 수 있습니다.",
 			},
 			{
 				id: "pages",
@@ -145,7 +145,7 @@ const QNA: Record<string, QnaCopy> = {
 				id: "errors",
 				question: "요청이 너무 많거나 키가 유효하지 않나요?",
 				answer:
-					"잘못된 키(E11): 설정에서 수정하세요. 요청 과다(E12): 잠시 후 재시도하거나 AI Studio 할당량을 확인하세요. 그 외: 다른 기사 페이지에서 다시 요약해 보세요.",
+					"잘못된 키(E11): 설정에서 수정하세요. 요청 과다(E12): 잠시 후 재시도하거나 AI Studio 할당량을 확인하세요. 선불 크레딧 소진(E14): 같은 결제 계정이면 키를 새로 발급해도 해결되지 않으니, AI Studio에서 크레딧을 충전하거나(반영까지 시간이 걸릴 수 있음) 결제가 연결되지 않은 프로젝트의 키를 입력하세요. 후자는 무료 등급이므로 데이터 활용과 EEA·영국·스위스 제약은 약관 항목을 참고하세요. 그 외: 다른 기사 페이지에서 다시 요약해 보세요.",
 			},
 			{
 				id: "contact",
@@ -174,13 +174,13 @@ const QNA: Record<string, QnaCopy> = {
 				id: "free-tier",
 				question: "API 免费吗？有每日限制吗？",
 				answer:
-					"Google 提供免费额度，按项目限制每分钟/每日请求次数（因模型而异）。本扩展优先使用 gemini-3.5-flash-lite。若出现限流，请在 AI Studio 查看用量。",
+					"Google 提供免费额度，按项目限制每分钟/每日请求次数（因模型而异）。本扩展优先使用最新的 Gemini Flash-Lite 模型。若出现限流，请在 AI Studio 查看用量。",
 			},
 			{
 				id: "privacy",
 				question: "会保存哪些数据？",
 				answer:
-					"无 Web Summary 后端服务器。API 密钥（若保存）、界面语言、Auto 开关与 Auto 排除域名列表仅存于本机 chrome.storage.local。摘要不会持久保存，仅在侧边栏显示。",
+					"无 Web Summary 后端服务器。API 密钥（若保存）、界面语言、Auto 开关、Auto 排除域名列表与摘要记录仅存于本机 chrome.storage.local。摘要记录包含页面地址和摘要，可在侧边栏关闭或删除。",
 			},
 			{
 				id: "pages",
@@ -216,7 +216,7 @@ const QNA: Record<string, QnaCopy> = {
 				id: "errors",
 				question: "请求过多或密钥无效？",
 				answer:
-					"密钥无效（E11）：请在设置中更换。请求过多（E12）：稍候再试或查看 AI Studio 配额。其他错误：换一篇文章页或再次点击摘要。",
+					"密钥无效（E11）：请在设置中更换。请求过多（E12）：稍候再试或查看 AI Studio 配额。预付费额度用完（E14）：同一结算账号下新建密钥无济于事，请在 AI Studio 中充值（生效可能需要一些时间），或使用未关联结算的项目的密钥。后者属于免费层级，数据使用及 EEA、英国、瑞士的限制请参阅条款条目。其他错误：换一篇文章页或再次点击摘要。",
 			},
 			{
 				id: "contact",

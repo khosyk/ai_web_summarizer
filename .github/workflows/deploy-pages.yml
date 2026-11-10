@@ -30,10 +30,17 @@ jobs:
       - name: Regenerate third-party notices
         run: yarn notices
 
+      - name: Require publish date in legal pages
+        run: |
+          if grep -l PUBLISH_DATE_TBD public/legal.html docs/PRIVACY_POLICY.md; then
+            echo "::error::Replace PUBLISH_DATE_TBD with the actual publish date (docs/DONATION.md)"
+            exit 1
+          fi
+
       - name: Prepare Pages artifact (legal + third-party only)
         run: |
           mkdir -p .pages-deploy
-          cp public/legal.html public/third-party-notices.html .pages-deploy/
+          cp public/legal.html public/legal.js public/third-party-notices.html .pages-deploy/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

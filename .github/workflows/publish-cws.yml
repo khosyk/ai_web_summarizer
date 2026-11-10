@@ -11,6 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Require publish date in legal pages
+        run: |
+          if grep -l PUBLISH_DATE_TBD public/legal.html docs/PRIVACY_POLICY.md; then
+            echo "::error::Replace PUBLISH_DATE_TBD with the actual publish date (docs/DONATION.md)"
+            exit 1
+          fi
+
       - name: Verify manifest and package versions match
         run: |
           MANIFEST=$(node -p "require('./public/manifest.json').version")

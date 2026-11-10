@@ -12,6 +12,8 @@ import {
 import { detectServiceLang } from "./detectServiceLang";
 import { LEGAL_LINK, PRIVACY_DETAIL, type ServiceLang } from "./privacyNotice";
 import { openLegalPage } from "./openLegalPage";
+import { DonationDialog } from "./components/DonationDialog";
+import { DonationNotice } from "./components/DonationNotice";
 import { QnaAccordion } from "./components/QnaAccordion";
 import { getQnaCopy, QNA_SECTION_ID } from "./qnaContent";
 import { getUiLanguage, UI_LANGUAGE_STORAGE_KEY } from "./uiLanguageStorage";
@@ -393,6 +395,7 @@ function GuideImageCard({
 function WelcomePage() {
 	const [language, setLanguage] = useState<ServiceLang>(detectLang);
 	const [lightbox, setLightbox] = useState<LightboxTarget | null>(null);
+	const [isDonationOpen, setIsDonationOpen] = useState(false);
 	const T = TRANSLATIONS[language];
 	const qna = getQnaCopy(language);
 
@@ -443,6 +446,15 @@ function WelcomePage() {
 			{lightbox ? (
 				<ImageLightbox target={lightbox} onClose={() => setLightbox(null)} />
 			) : null}
+			<DonationNotice
+				language={language}
+				onOpenDonation={() => setIsDonationOpen(true)}
+			/>
+			<DonationDialog
+				isOpen={isDonationOpen}
+				language={language}
+				onClose={() => setIsDonationOpen(false)}
+			/>
 			<div className="mx-auto max-w-2xl space-y-8">
 				<header className="space-y-3">
 					<p className="text-xs font-black uppercase tracking-widest text-indigo-600">

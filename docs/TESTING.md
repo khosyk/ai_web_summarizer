@@ -106,6 +106,7 @@ Gemini structured output(JSON)을 UI에 표시할 `StructuredSummary`로 변환�
 | 테스트          | 입력                            | 기대 코드/메시지                           |
 | --------------- | ------------------------------- | ------------------------------------------ |
 | 401             | HTTP 401                        | **E11** (API 키 거부)                      |
+| 402             | HTTP 402 / 선불 크레딧 소진     | **E14** (재시도·모델 전환 없음)            |
 | 429             | HTTP 429 / `RESOURCE_EXHAUSTED` | **E12** (rate limit)                       |
 | 503             | 기타 HTTP                       | **E13** (일시 불가)                        |
 | WebSummaryError | `E02`, English                  | "Gemini API key" 문구 + `[E02]` log detail |
@@ -194,13 +195,48 @@ Settings·사이드패널에서 쓰는 hostname 블록리스트의 **순수 정�
 
 ## 10. Gemini 클라이언트 설정 (`geminiClient.test.ts`)
 
-**상수:** `GEMINI_MODEL`, `GEMINI_MODEL_FALLBACK`
+**상수:** `GEMINI_MODEL`, `GEMINI_MODEL_FALLBACK`, `GEMINI_MODEL_PINNED` (`fetch` mock)
 
-| 테스트       | 검증 내용                                                               |
-| ------------ | ----------------------------------------------------------------------- |
-| model config | primary `gemini-3.5-flash-lite`, fallback `gemini-3.5-flash`, 서로 다름 |
+| 테스트            | 검증 내용                                                 |
+| ----------------- | --------------------------------------------------------- |
+| model config      | primary는 `-latest` 별칭, 나머지 둘은 고정 모델           |
+| 요청 본문         | `temperature` 없음, 고정 모델에는 `thinkingConfig` 없음   |
+| 모델 거부         | HTTP 400·404, `MAX_TOKENS` 빈 응답 → 고정 모델            |
+| 일시 장애         | HTTP 429·503, 시간 초과 → flash (거부되면 고정 모델)      |
+| 사용자 중지       | 요청 취소, 다른 모델로 넘기지 않음                        |
+| 키 거부·기타 오류 | E11, HTTP 500 → 다른 모델로 넘기지 않음                   |
+| E10 재시도        | 마지막 시도는 고정 모델                                   |
+| 표시 값           | `modelVersion` 우선, 응답한 모델의 출력 상한              |
 
-HTTP·`fetch`·E10/E12 재시도 루프는 mock 없이 **미테스트** (위 「의도적으로 테스트하지 않는 영역」 참고).
+실제 API 호출은 `geminiClient.live.test.ts`가 담당합니다. `GEMINI_SMOKE_API_KEY`가 없으면 건너뛰며, [`model-smoke.yml`](../.github/workflows/model-smoke.yml)이 주 1회 실행합니다.
+
+---
+
+## 11. 후원 (`donation.test.ts`, `DonationDialog.test.tsx`, `DonationNotice.test.tsx`, `loadQrLibrary.test.ts`)
+
+| 테스트      | 검증 내용                                                    |
+| ----------- | ------------------------------------------------------------ |
+| 설정값 검증 | 외부 이미지·잘못된 링크 거부, 값을 비우면 해당 탭 제거       |
+| 기본 탭     | 한국어는 카카오페이, 그 외는 PayPal, 없으면 남은 탭          |
+| 대화상자    | 탭 없으면 숨김, 하나면 탭 목록 없음, 화살표 키, 링크 속성    |
+| QR 로드     | PayPal 탭을 열 때만 로드, SRI, 실패 문구, 다음 번에 재시도   |
+| 설치 가이드 알림 | 닫기는 이번 화면만, 하루 종일 보지 않기는 24시간, 탭 없으면 숨김 |
+
+실제 QR 스캔과 송금은 자동화하지 않습니다.
+
+---
+
+## 12. 요약 기록 (`summaryHistory.test.ts`)
+
+| 테스트      | 검증 내용                                                          |
+| ----------- | ------------------------------------------------------------------ |
+| 저장값 검증 | http(s) 외 주소·형식이 틀린 항목 거부                              |
+| 저장과 한도 | 같은 글 교체, 나중에 읽기 유지, 200개 초과 시 오래된 일반 기록부터 |
+| 재사용      | URL·언어가 같고 24시간 안일 때만, 해시 라우트(`#/글`)는 글마다 구분 |
+| 검색·필터   | 제목과 사이트만 검색, 쿼리 문자열은 검색 안 함                     |
+| 저장소      | 동시 저장 유실 없음, 쓰기 실패 후 복구, 자동 저장 꺼짐 동작        |
+| 설치 기본값 | 새 설치는 켜짐, 업데이트는 꺼짐, 이미 고른 값은 유지               |
+| Auto 일시 중지 | 기록을 보는 동안 건너뛰고, 다른 페이지로 이동하면 재개          |
 
 ---
 
@@ -209,7 +245,6 @@ HTTP·`fetch`·E10/E12 재시도 루프는 mock 없이 **미테스트** (위 「
 | 영역                                                                                   | 이유                                            |
 | -------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | `App.tsx`, `SummaryResultView.tsx`                                                     | Chrome·React 통합; E2E/수동 검증                |
-| `geminiClient.ts`                                                                      | HTTP·`fetch` mock 없음; 모델 상수만 단위 테스트 |
 | `content.ts`, `background.ts`                                                          | `chrome.*` API 의존                             |
 | `apiKeyStorage.ts`, `uiLanguageStorage.ts`, `autoSummarizeBlocklist.ts` (storage CRUD) | `chrome.storage` 의존                           |
 | `yarn build` / `dist/`                                                                 | 별도 빌드·확장 로드로 검증                      |

@@ -15,6 +15,16 @@ const validPayload = {
 };
 
 describe("parseStructuredSummary", () => {
+	it("removes bold markers from the title", () => {
+		const result = parseStructuredSummary(
+			JSON.stringify({ ...validPayload, title: "Bike lanes in **22** districts" }),
+			"Scraped title",
+			"English",
+		);
+
+		expect(result.title).toBe("Bike lanes in 22 districts");
+	});
+
 	it("parses valid JSON into structured summary", () => {
 		const result = parseStructuredSummary(
 			JSON.stringify(validPayload),

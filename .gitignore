@@ -9,3 +9,6 @@ package-lock.json
 .pages-deploy/
 .cursor
 .vscode
+# 로컬 빌드 산출물과 임시 파일
+/dist.zip
+/x

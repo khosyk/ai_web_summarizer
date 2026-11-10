@@ -93,8 +93,8 @@ FEATURES
 
 PRIVACY
 
-• No backend — no collection of page text, URLs, or summaries.
-• Local only — key, language, Auto toggle, excluded domains list in chrome.storage.local.
+• No backend — page text, URLs, and summaries are never sent to us.
+• Local only — key, language, Auto toggle, excluded domains list, and summary history in chrome.storage.local. Turn history off or delete it anytime.
 • Direct to Google — browser → Gemini with your key (manual or Auto).
 
 REQUIREMENTS
@@ -142,8 +142,8 @@ Web Summary를 설치하는 이유
 
 개인정보
 
-• Web Summary 서버 없음 — 페이지 본문, URL, 요약을 수집·저장하지 않음.
-• 로컬만 — API 키(저장 시), UI 언어, Auto 토글, Auto 제외 도메인 목록은 chrome.storage.local.
+• Web Summary 서버 없음 — 페이지 본문, URL, 요약을 운영자에게 보내지 않음.
+• 로컬만 — API 키(저장 시), UI 언어, Auto 토글, Auto 제외 도메인 목록, 요약 기록은 chrome.storage.local. 기록은 언제든 끄거나 삭제 가능.
 • Google 직접 연결 — 수동 또는 Auto 시 브라우저에서 Gemini API로 전송.
 
 요구 사항
@@ -191,8 +191,8 @@ Web Summary를 설치하는 이유
 
 隐私
 
-• 无 Web Summary 服务端 — 不收集、不记录、不保存页面正文、URL 或摘要。
-• 仅本地 — API 密钥（若保存）、界面语言、Auto 开关、Auto 排除域名列表存于 chrome.storage.local。
+• 无 Web Summary 服务端 — 页面正文、URL 和摘要不会发送给我们。
+• 仅本地 — API 密钥（若保存）、界面语言、Auto 开关、Auto 排除域名列表与摘要记录存于 chrome.storage.local，可随时关闭或删除记录。
 • 直连 Google — 手动或 Auto 时，正文由浏览器用您的密钥发送至 Gemini API。
 
 使用要求
@@ -222,6 +222,10 @@ Web Summary를 설치하는 이유
 | 简体中文 | AI 建议值得读/可跳过（三行是否够用）。侧边栏摘要，自带 Gemini 密钥，无服务端。 |
 
 ---
+
+## Optional gift link
+
+사이드패널 하단의 「개발자에게 커피 한 잔」은 외부 송금 서비스(카카오페이, PayPal)로 연결하는 선택 링크입니다. 요약을 기다리는 동안 같은 안내 문구가 나오고, 설치 가이드 오른쪽 위에도 닫을 수 있는 알림으로 나옵니다. 기능을 잠그지 않고, 확장 안에서 결제를 처리하지 않으며, 결제 정보를 받지 않습니다. 심사 메모에 적을 내용입니다. 후원 중단 방법은 [`DONATION.md`](DONATION.md)를 참고합니다.
 
 ## Single purpose (Privacy tab)
 
@@ -262,10 +266,10 @@ Help the user decide whether to read the current web page tab and summarize it u
 | Permission | Purpose |
 |------------|---------|
 | `sidePanel` | Show the summarizer UI |
-| `storage` | Save your API key, UI language, Auto toggle, and excluded domains locally |
+| `storage` | Save your API key, UI language, Auto toggle, excluded domains, and summary history locally |
 | `activeTab` + `scripting` | Run extraction when you summarize (manual or Auto after dwell) |
 | `http://*/*`, `https://*/*` | Host access to read the active http(s) tab from the side panel |
-| `tabs` | Auto summarize on tab switch; open setup guide / Settings |
+| `tabs` | Auto summarize on tab switch; match the current tab to saved summaries; open setup guide / Settings |
 | `generativelanguage.googleapis.com` | Call Gemini with your key |
 
 ---

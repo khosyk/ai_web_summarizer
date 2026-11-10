@@ -83,7 +83,8 @@ export function parseStructuredSummary(
 		parsed.readRecommendation,
 	);
 	const readReason = normalizeLine(parsed.readReason);
-	const titleRaw = normalizeLine(parsed.title);
+	// 제목은 마크다운 없이 표시되므로 모델이 붙인 볼드 기호 제거
+	const titleRaw = normalizeLine(parsed.title).replace(/\*\*/g, "");
 	const briefRaw = parsed.briefLines;
 
 	if (!readReason) {

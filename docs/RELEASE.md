@@ -4,15 +4,16 @@ CWS zip 업로드·GitHub Pages(legal) 배포·CI 흐름. **OAuth 자격 증명 
 
 ## CI workflows
 
-| Workflow | 트리거 | 역할 |
-|----------|--------|------|
-| [`test.yml`](../.github/workflows/test.yml) | push(전 branch), PR→`main` | `yarn verify` |
-| [`deploy-pages.yml`](../.github/workflows/deploy-pages.yml) | `main` push, 수동 | `public/legal.html` 등 → GitHub Pages (Privacy URL) |
-| [`publish-cws.yml`](../.github/workflows/publish-cws.yml) | `v*` tag push, 수동 | verify → build → zip → **CWS upload** (`action: upload`) |
+| Workflow                                                    | 트리거                     | 역할                                                     |
+| ----------------------------------------------------------- | -------------------------- | -------------------------------------------------------- |
+| [`test.yml`](../.github/workflows/test.yml)                 | push(전 branch), PR→`main` | `yarn verify`                                            |
+| [`deploy-pages.yml`](../.github/workflows/deploy-pages.yml) | `main` push, 수동          | `public/legal.html` 등 → GitHub Pages (Privacy URL)      |
+| [`publish-cws.yml`](../.github/workflows/publish-cws.yml)   | `v*` tag push, 수동        | verify → build → zip → **CWS upload** (`action: upload`) |
+| [`model-smoke.yml`](../.github/workflows/model-smoke.yml)   | 매주 월요일, 수동          | Gemini 모델 3종 실제 호출, 실패 시 GitHub 알림           |
 
 ```text
 main push     → test + legal Pages
-v1.0.1 tag    → CWS zip upload (draft)
+v1.0.2 tag    → CWS zip upload (draft)
 Dashboard     → Submit / Publish (수동, upload 모드)
 ```
 
@@ -20,11 +21,11 @@ Dashboard     → Submit / Publish (수동, upload 모드)
 
 ## 버전 규칙
 
-| 소스 | 역할 |
-|------|------|
-| **`public/manifest.json` → `version`** | CWS·확장에 표시되는 **공식 버전** (`dist/manifest.json`으로 빌드) |
-| `package.json` → `version` | npm 미배포; **manifest와 동일하게 유지** (관례) |
-| Git tag `v*` | `publish-cws` 트리거; **`v` + manifest 버전** (예: manifest `1.0.1` → tag `v1.0.1`) |
+| 소스                                   | 역할                                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| **`public/manifest.json` → `version`** | CWS·확장에 표시되는 **공식 버전** (`dist/manifest.json`으로 빌드)                   |
+| `package.json` → `version`             | npm 미배포; **manifest와 동일하게 유지** (관례)                                     |
+| Git tag `v*`                           | `publish-cws` 트리거; **`v` + manifest 버전** (예: manifest `1.0.1` → tag `v1.0.1`) |
 
 `publish-cws.yml` 검증:
 
@@ -65,12 +66,12 @@ Dashboard     → Submit / Publish (수동, upload 모드)
 4. [OAuth Playground](https://developers.google.com/oauthplayground): scope `https://www.googleapis.com/auth/chromewebstore` → **refresh_token** 발급 (CWS 소유 계정으로 Authorize)
 5. GitHub repo → **Settings → Secrets and variables → Actions → Repository secrets**
 
-| Secret 이름 | 내용 (값은 GitHub에만 저장) |
-|-------------|----------------------------|
-| `CHROME_CLIENT_ID` | OAuth Web client ID |
-| `CHROME_CLIENT_SECRET` | OAuth client secret |
+| Secret 이름            | 내용 (값은 GitHub에만 저장)         |
+| ---------------------- | ----------------------------------- |
+| `CHROME_CLIENT_ID`     | OAuth Web client ID                 |
+| `CHROME_CLIENT_SECRET` | OAuth client secret                 |
 | `CHROME_REFRESH_TOKEN` | Playground에서 발급한 refresh token |
-| `CHROME_EXTENSION_ID` | CWS Item ID (32자) |
+| `CHROME_EXTENSION_ID`  | CWS Item ID (32자)                  |
 
 **Environment secrets**는 workflow에 `environment:`가 없으면 사용되지 않습니다. 위 4개는 **Repository secrets**에 등록.
 
@@ -85,5 +86,19 @@ Dashboard     → Submit / Publish (수동, upload 모드)
 - refresh token **장기 미사용 시 만료** 가능 → 주기적 `v*` 릴리스 또는 토큰 재발급
 - CWS **Extension ID**는 공개에 가깝지만 repo secret으로 두어 workflow만 참조
 - `action: upload`만 사용: CI는 zip 업로드까지; **`action: publish`**로 바꾸면 심사 제출까지 자동 (운영 정책에 맞게 선택)
+
+---
+
+## Gemini 모델 점검
+
+모델 호출은 `latest` 별칭을 따라가므로 새 모델 출시만으로는 릴리스하지 않습니다. 사용자 키로 호출하는 구조라 Google의 별칭 변경 공지 메일이 개발자에게 오지 않을 수 있어, `model-smoke.yml`로 직접 확인합니다.
+
+1. Repository secret `GEMINI_SMOKE_API_KEY`에 점검 전용 Gemini API 키 등록
+2. Actions → **Gemini model smoke test** → **Run workflow**로 첫 실행 확인
+3. 실패하면 로그에서 모델과 오류 확인. `GEMINI_MODEL_FALLBACK`·`GEMINI_MODEL_PINNED` 변경이 필요할 때만 릴리스
+
+저장소에 **60일간 활동이 없으면** GitHub가 예약 실행을 멈출 수 있습니다. 이 경우 Actions에서 다시 활성화합니다.
+
+---
 
 스토어 카피·Privacy URL·수동 zip: [`STORE_LISTING.md`](STORE_LISTING.md), [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md).

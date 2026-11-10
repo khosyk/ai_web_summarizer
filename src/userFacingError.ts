@@ -10,6 +10,7 @@ export const ERROR_CODES = [
   'E11',
   'E12',
   'E13',
+  'E14',
   'E99',
 ] as const;
 
@@ -71,6 +72,11 @@ const USER_COPY: Record<ErrorCode, { en: string; ko: string; zh: string }> = {
     ko: '요약 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
     zh: '摘要服务暂时不可用，请稍后再试。',
   },
+  E14: {
+    en: 'The Google billing account behind this key is out of prepaid credits, and a new key on the same billing account will not work. Add credits in AI Studio (it may take a while to apply). You can also use a key from a project with no billing linked, but that is the free tier, where Google may use what you send to improve its products.',
+    ko: '이 키가 연결된 Google 결제 계정의 선불 크레딧이 소진되었습니다. 같은 결제 계정이면 키를 새로 발급해도 쓸 수 없습니다. AI Studio에서 크레딧을 충전해 주세요(반영까지 시간이 걸릴 수 있어요). 결제가 연결되지 않은 프로젝트의 키를 쓸 수도 있지만, 무료 등급이라 전송한 내용이 Google 제품 개선에 쓰일 수 있습니다.',
+    zh: '此密钥所关联的 Google 结算账号预付费额度已用完，同一结算账号下即使新建密钥也无法使用。请在 AI Studio 中充值（生效可能需要一些时间）。也可以使用未关联结算的项目的密钥，但那属于免费层级，Google 可能会将您发送的内容用于改进产品。',
+  },
   E99: {
     en: 'Something went wrong. Please try again.',
     ko: '문제가 발생했습니다. 다시 시도해 주세요.',
@@ -80,11 +86,13 @@ const USER_COPY: Record<ErrorCode, { en: string; ko: string; zh: string }> = {
 
 export class WebSummaryError extends Error {
   readonly code: ErrorCode;
+  readonly httpStatus?: number;
 
-  constructor(code: ErrorCode, detail?: string) {
+  constructor(code: ErrorCode, detail?: string, httpStatus?: number) {
     super(detail ? `[${code}] ${detail}` : `[${code}]`);
     this.name = 'WebSummaryError';
     this.code = code;
+    this.httpStatus = httpStatus;
   }
 }
 
@@ -112,13 +120,18 @@ type GeminiErrBody = {
   status?: string;
 };
 
-/** Gemini HTTP 응답 → E11/E12/E13 */
+/** Gemini HTTP 응답 → E11/E12/E13/E14 */
 export function webSummaryErrorFromGeminiResponse(
   httpStatus: number,
   errObj: GeminiErrBody | undefined,
   fallbackDetail: string,
 ): WebSummaryError {
   const detail = errObj?.message ?? fallbackDetail;
+
+  // 본문이 RESOURCE_EXHAUSTED여도 재시도로는 풀리지 않으므로 E12보다 먼저 확인
+  if (httpStatus === 402 || /prepayment credits/i.test(detail)) {
+    return new WebSummaryError('E14', detail, httpStatus);
+  }
 
   if (
     httpStatus === 401 ||
@@ -137,7 +150,7 @@ export function webSummaryErrorFromGeminiResponse(
     return new WebSummaryError('E12', detail);
   }
 
-  return new WebSummaryError('E13', detail);
+  return new WebSummaryError('E13', detail, httpStatus);
 }
 
 export type ResolvedUserError = {

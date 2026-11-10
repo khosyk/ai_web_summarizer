@@ -21,6 +21,30 @@ describe('webSummaryErrorFromGeminiResponse', () => {
     expect(error.code).toBe('E12');
   });
 
+  it('maps depleted prepaid credits to E14 even when the body says quota', () => {
+    const error = webSummaryErrorFromGeminiResponse(
+      402,
+      {
+        status: 'RESOURCE_EXHAUSTED',
+        message: 'Your prepayment credits are depleted.',
+      },
+      'Payment required',
+    );
+    expect(error.code).toBe('E14');
+  });
+
+  it('keeps an ordinary quota error mentioning billing as E12', () => {
+    const error = webSummaryErrorFromGeminiResponse(
+      429,
+      {
+        status: 'RESOURCE_EXHAUSTED',
+        message: 'You exceeded your current quota, please check your plan and billing details.',
+      },
+      'Too many requests',
+    );
+    expect(error.code).toBe('E12');
+  });
+
   it('maps other HTTP errors to E13 service unavailable', () => {
     const error = webSummaryErrorFromGeminiResponse(503, undefined, 'Unavailable');
     expect(error.code).toBe('E13');

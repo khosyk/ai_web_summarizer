@@ -1,10 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { FileText, ArrowRight, Clock, Settings } from "lucide-react";
+import {
+	FileText,
+	ArrowRight,
+	Clock,
+	Coffee,
+	History,
+	Settings,
+} from "lucide-react";
 import { extractLoadingSnippets } from "./extractLoadingSnippets";
 import { LoadingSnippetTypewriter } from "./components/LoadingSnippetTypewriter";
 import { SummaryResultView } from "./components/SummaryResultView";
+import { DonationDialog } from "./components/DonationDialog";
 import { ErrorDialog } from "./components/ErrorDialog";
+import {
+	HISTORY_COPY,
+	HistoryPanel,
+	SavedSummaryBar,
+} from "./components/HistoryPanel";
+import { DONATION_COPY, payTabs } from "./donation";
 import { LanguagePicker } from "./components/LanguagePicker";
 import { getGeminiApiKey, GEMINI_API_KEY_STORAGE_KEY } from "./apiKeyStorage";
 import { detectServiceLang } from "./detectServiceLang";
@@ -38,6 +52,24 @@ import {
 	isHostBlocked,
 	isTabUrlAutoBlocked,
 } from "./autoSummarizeBlocklist";
+
+import {
+	SUMMARY_HISTORY_ENABLED_KEY,
+	SUMMARY_HISTORY_KEY,
+	clearHistory,
+	findReusableEntry,
+	isAutoPausedForHistory,
+	getHistoryEnabled,
+	getSummaryHistory,
+	historyEntryKey,
+	normalizeHistoryUrl,
+	parseHistory,
+	removeFromHistory,
+	saveToHistory,
+	setHistoryEnabled,
+	setReadLater,
+	type HistoryEntry,
+} from "./summaryHistory";
 
 function isChromeExtension(): boolean {
 	return typeof chrome !== "undefined" && Boolean(chrome.runtime?.id);
@@ -84,11 +116,14 @@ type UiCopy = {
 type AppSummaryResult = {
 	sourceTabUrl: string;
 	summaryLanguage: ServiceLang;
+	/** 기록에서 불러온 요약이면 저장 시각 */
+	savedAt?: number;
+	isIncognito?: boolean;
 	readRecommendation: "read" | "skip";
 	readReason: string;
 	title: string;
 	briefLines: string[];
-	stats: {
+	stats?: {
 		originalLength: number;
 		model?: string;
 		sentToModelChars?: number;
@@ -371,6 +406,42 @@ async function extractPageDataFromTab(
 	throw new WebSummaryError("E05", "extract_no_response");
 }
 
+function entryFromSummary(
+	summary: Pick<
+		AppSummaryResult,
+		"readRecommendation" | "readReason" | "title" | "briefLines"
+	>,
+	url: string,
+	language: ServiceLang,
+	savedAt: number = Date.now(),
+): HistoryEntry {
+	return {
+		url: normalizeHistoryUrl(url),
+		language,
+		readRecommendation: summary.readRecommendation,
+		readReason: summary.readReason,
+		title: summary.title,
+		briefLines: summary.briefLines,
+		savedAt,
+		isReadLater: false,
+	};
+}
+
+function resultFromEntry(
+	entry: HistoryEntry,
+	sourceTabUrl: string,
+): AppSummaryResult {
+	return {
+		sourceTabUrl,
+		summaryLanguage: entry.language,
+		savedAt: entry.savedAt,
+		readRecommendation: entry.readRecommendation,
+		readReason: entry.readReason,
+		title: entry.title,
+		briefLines: entry.briefLines,
+	};
+}
+
 export default function App() {
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [language, setLanguageState] = useState<ServiceLang>(() =>
@@ -384,6 +455,11 @@ export default function App() {
 	const [currentTabHost, setCurrentTabHost] = useState<string | null>(null);
 	const [blockSiteFeedback, setBlockSiteFeedback] = useState("");
 	const [result, setResult] = useState<AppSummaryResult | null>(null);
+	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+	const [isOpenedFromHistory, setIsOpenedFromHistory] = useState(false);
+	const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+	const [isHistoryEnabled, setIsHistoryEnabledState] = useState(true);
+	const [activeTabUrl, setActiveTabUrl] = useState("");
 
 	const [loadingPhaseIdx, setLoadingPhaseIdx] = useState(0);
 	const [waitingHintIdx, setWaitingHintIdx] = useState(0);
@@ -403,6 +479,10 @@ export default function App() {
 	const isProcessingRef = useRef(isProcessing);
 	const resultRef = useRef(result);
 	const languageRef = useRef(language);
+	const isHistoryEnabledRef = useRef(isHistoryEnabled);
+	const isHistoryOpenRef = useRef(isHistoryOpen);
+	const isOpenedFromHistoryRef = useRef(isOpenedFromHistory);
+	const urlWhenHistoryOpenedRef = useRef("");
 
 	autoSummarizeEnabledRef.current = autoSummarizeEnabled;
 	blockedHostsRef.current = blockedHosts;
@@ -410,7 +490,11 @@ export default function App() {
 	isProcessingRef.current = isProcessing;
 	resultRef.current = result;
 	languageRef.current = language;
+	isHistoryEnabledRef.current = isHistoryEnabled;
+	isHistoryOpenRef.current = isHistoryOpen;
+	isOpenedFromHistoryRef.current = isOpenedFromHistory;
 
+	const [isDonationOpen, setIsDonationOpen] = useState(false);
 	const T = getT(language);
 
 	const clearAutoDwellTimer = useCallback(() => {
@@ -450,7 +534,10 @@ export default function App() {
 	}, [clearAutoDwellTimer]);
 
 	const runAnalysis = useCallback(
-		async (trigger: "manual" | "auto" = "manual") => {
+		async (
+			trigger: "manual" | "auto" = "manual",
+			{ isRefresh = false }: { isRefresh?: boolean } = {},
+		) => {
 			if (isProcessingRef.current) return;
 
 			if (!isChromeExtension()) {
@@ -479,11 +566,28 @@ export default function App() {
 			const currentLanguage = languageRef.current;
 			const currentResult = resultRef.current;
 			if (
+				!isRefresh &&
 				currentResult &&
 				currentResult.sourceTabUrl === tabUrl &&
 				currentResult.summaryLanguage === currentLanguage
 			) {
 				return;
+			}
+
+			// 시크릿 창의 글은 일반 프로필 저장소에 남기지 않음
+			const canUseHistory = !tab.incognito;
+
+			if (!isRefresh && canUseHistory && isHistoryEnabledRef.current) {
+				const saved = findReusableEntry(
+					await getSummaryHistory(),
+					tabUrl,
+					currentLanguage,
+				);
+				if (saved) {
+					setIsOpenedFromHistory(false);
+					setResult(resultFromEntry(saved, tabUrl));
+					return;
+				}
 			}
 
 			const runId = analysisRunIdRef.current + 1;
@@ -493,7 +597,9 @@ export default function App() {
 
 			setLoadingSnippets([]);
 			setIsProcessing(true);
-			setResult(null);
+			setIsOpenedFromHistory(false);
+			// 다시 요약이 실패하거나 중지되면 저장본이 그대로 보이도록 유지
+			if (!isRefresh) setResult(null);
 
 			try {
 				const data = await extractPageDataFromTab(tab.id);
@@ -527,9 +633,18 @@ export default function App() {
 					...summary,
 					sourceTabUrl: tabUrl,
 					summaryLanguage: currentLanguage,
+					isIncognito: !canUseHistory,
 				});
 				setHasCompletedFirstSummaryState(true);
 				void setHasCompletedFirstSummary();
+				if (canUseHistory && isHistoryEnabledRef.current) {
+					void saveToHistory(
+						entryFromSummary(summary, tabUrl, currentLanguage),
+					).catch((error: unknown) => {
+						// 저장 실패가 요약 표시를 막으면 안 됨
+						console.warn("[Web Summary] history save failed", error);
+					});
+				}
 			} catch (e: unknown) {
 				if (isAbortError(e) || abortController.signal.aborted) return;
 				showError(e);
@@ -581,6 +696,17 @@ export default function App() {
 					if (!activeTab?.id || !activeUrl.startsWith("http")) return;
 					if (isTabUrlAutoBlocked(activeUrl, blockedHostsRef.current)) return;
 
+					if (
+						isAutoPausedForHistory({
+							isHistoryOpen: isHistoryOpenRef.current,
+							isOpenedFromHistory: isOpenedFromHistoryRef.current,
+							activeUrl,
+							urlWhenOpened: urlWhenHistoryOpenedRef.current,
+						})
+					) {
+						return;
+					}
+
 					const currentResult = resultRef.current;
 					const currentLanguage = languageRef.current;
 					if (
@@ -603,7 +729,35 @@ export default function App() {
 		void getHasCompletedFirstSummary().then(setHasCompletedFirstSummaryState);
 		void getAutoSummarizeBlockedHosts().then(setBlockedHosts);
 		void refreshActiveTabHost();
+		void getSummaryHistory().then(setHistoryEntries);
+		void getHistoryEnabled().then(setIsHistoryEnabledState);
 	}, [refreshActiveTabHost]);
+
+	useEffect(() => {
+		if (!isChromeExtension()) return;
+
+		const syncActiveTabUrl = () => {
+			void chrome.tabs
+				.query({ active: true, currentWindow: true })
+				.then(([tab]) => setActiveTabUrl(tab?.url ?? ""));
+		};
+		syncActiveTabUrl();
+
+		const onTabUpdated = (
+			_tabId: number,
+			changeInfo: { status?: string; url?: string },
+		) => {
+			if (changeInfo.status === "complete" || changeInfo.url) {
+				syncActiveTabUrl();
+			}
+		};
+		chrome.tabs.onActivated.addListener(syncActiveTabUrl);
+		chrome.tabs.onUpdated.addListener(onTabUpdated);
+		return () => {
+			chrome.tabs.onActivated.removeListener(syncActiveTabUrl);
+			chrome.tabs.onUpdated.removeListener(onTabUpdated);
+		};
+	}, []);
 
 	useEffect(() => {
 		const syncApiKeyState = () => {
@@ -639,6 +793,14 @@ export default function App() {
 						next.filter((entry): entry is string => typeof entry === "string"),
 					);
 				}
+			}
+			if (SUMMARY_HISTORY_KEY in changes) {
+				setHistoryEntries(parseHistory(changes[SUMMARY_HISTORY_KEY].newValue));
+			}
+			if (SUMMARY_HISTORY_ENABLED_KEY in changes) {
+				setIsHistoryEnabledState(
+					changes[SUMMARY_HISTORY_ENABLED_KEY].newValue !== false,
+				);
 			}
 			if (FIRST_SUMMARY_COMPLETED_STORAGE_KEY in changes) {
 				setHasCompletedFirstSummaryState(
@@ -713,6 +875,8 @@ export default function App() {
 		autoSummarizeEnabled,
 		hasApiKey,
 		language,
+		// 기록 화면을 닫으면 그동안 건너뛴 Auto를 다시 확인
+		isHistoryOpen,
 		scheduleAutoSummarize,
 		clearAutoDwellTimer,
 	]);
@@ -781,7 +945,72 @@ export default function App() {
 		return () => window.clearInterval(interval);
 	}, [isWaitingOnModel, language]);
 
-	const handleStartAnalysis = () => void runAnalysis("manual");
+	const handleStartAnalysis = () => {
+		setIsHistoryOpen(false);
+		void runAnalysis("manual");
+	};
+
+	const handleRefreshSummary = () => {
+		void runAnalysis("manual", { isRefresh: true });
+	};
+
+	const handleOpenHistoryEntry = (entry: HistoryEntry) => {
+		urlWhenHistoryOpenedRef.current = activeTabUrl;
+		setResult(resultFromEntry(entry, entry.url));
+		setIsOpenedFromHistory(true);
+		setIsHistoryOpen(false);
+	};
+
+	const logHistoryError = (error: unknown) => {
+		console.warn("[Web Summary] history update failed", error);
+	};
+
+	const handleToggleReadLater = (entry: HistoryEntry) => {
+		void setReadLater(entry, !entry.isReadLater, isHistoryEnabled).catch(
+			logHistoryError,
+		);
+	};
+
+	const handleRemoveHistoryEntry = (entry: HistoryEntry) => {
+		// 지운 기록의 저장본이 화면에 남지 않게 함
+		if (
+			resultEntry &&
+			result?.savedAt !== undefined &&
+			historyEntryKey(resultEntry) === historyEntryKey(entry)
+		) {
+			setResult(null);
+		}
+		void removeFromHistory(entry).catch(logHistoryError);
+	};
+
+	const handleClearHistory = () => {
+		if (result?.savedAt !== undefined) setResult(null);
+		void clearHistory().catch(logHistoryError);
+	};
+
+	const handleHistoryEnabledChange = (enabled: boolean) => {
+		setIsHistoryEnabledState(enabled);
+		void setHistoryEnabled(enabled).catch(logHistoryError);
+	};
+
+	const resultEntry: HistoryEntry | null = result
+		? (() => {
+				const candidate = entryFromSummary(
+					result,
+					result.sourceTabUrl,
+					result.summaryLanguage,
+					result.savedAt,
+				);
+				const key = historyEntryKey(candidate);
+				return (
+					historyEntries.find((entry) => historyEntryKey(entry) === key) ??
+					candidate
+				);
+			})()
+		: null;
+	const isResultOnActiveTab =
+		result !== null &&
+		normalizeHistoryUrl(activeTabUrl) === normalizeHistoryUrl(result.sourceTabUrl);
 
 	const isCurrentHostBlocked =
 		currentTabHost !== null && isHostBlocked(currentTabHost, blockedHosts);
@@ -810,6 +1039,20 @@ export default function App() {
 							id="panel-ui-language"
 							className="w-[5.75rem] shrink-0 [&>span]:sr-only [&_select]:border-slate-200 [&_select]:px-1.5 [&_select]:py-1 [&_select]:text-[9px] [&_select]:font-black"
 						/>
+						<button
+							type="button"
+							onClick={() => setIsHistoryOpen((isOpen) => !isOpen)}
+							aria-pressed={isHistoryOpen}
+							aria-label={HISTORY_COPY[language].open}
+							title={HISTORY_COPY[language].open}
+							className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-bold hover:border-indigo-300 hover:text-indigo-600 ${
+								isHistoryOpen
+									? "border-indigo-300 text-indigo-600"
+									: "border-slate-200 text-slate-500"
+							}`}
+						>
+							<History size={12} aria-hidden="true" />
+						</button>
 						<button
 							type="button"
 							onClick={openSettings}
@@ -912,208 +1155,260 @@ export default function App() {
 			</header>
 
 			<main className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30 p-4 custom-scrollbar">
-				<div className="space-y-4">
-					<AnimatePresence mode="wait">
-						{isProcessing && (
-							<motion.div
-								layout
-								initial={{ opacity: 0, y: 8 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0 }}
-								transition={{ duration: 0.22 }}
-								className="relative overflow-hidden rounded-2xl border border-indigo-100/80 bg-white px-5 py-6 shadow-[0_8px_30px_-12px_rgba(79,70,229,0.25)]"
-							>
+				{isHistoryOpen ? (
+					<HistoryPanel
+						language={language}
+						entries={historyEntries}
+						isAutoSaveEnabled={isHistoryEnabled}
+						onBack={() => setIsHistoryOpen(false)}
+						onOpenEntry={handleOpenHistoryEntry}
+						onToggleReadLater={handleToggleReadLater}
+						onRemoveEntry={handleRemoveHistoryEntry}
+						onClearAll={handleClearHistory}
+						onAutoSaveChange={handleHistoryEnabledChange}
+					/>
+				) : (
+					<div className="space-y-4">
+						<AnimatePresence mode="wait">
+							{isProcessing && (
 								<motion.div
-									aria-hidden
-									className="pointer-events-none absolute inset-y-0 left-0 w-[45%] bg-linear-to-r from-transparent via-indigo-400/25 to-transparent"
-									initial={{ x: "-110%" }}
-									animate={{ x: ["-110%", "320%"] }}
-									transition={{
-										duration: 2.6,
-										repeat: Infinity,
-										ease: "linear",
-									}}
-									style={{ willChange: "transform" }}
-								/>
-
-								<div className="relative z-1">
-									<div className="flex items-center justify-center gap-2.5 pb-6">
-										{phases.map((_, dotIdx) => (
-											<motion.span
-												key={dotIdx}
-												aria-hidden
-												className={`h-1 rounded-full ${
-													dotIdx <= phasedIdx ? "bg-indigo-600" : "bg-slate-200"
-												}`}
-												animate={{
-													width: dotIdx === phasedIdx ? 22 : 6,
-													opacity:
-														dotIdx === phasedIdx
-															? 1
-															: dotIdx < phasedIdx
-																? 0.7
-																: 0.35,
-												}}
-												transition={{
-													type: "spring",
-													stiffness: 420,
-													damping: 30,
-												}}
-											/>
-										))}
-									</div>
-
-									<AnimatePresence mode="wait">
-										<motion.div
-											key={
-												isWaitingOnModel ? `wait-${waitingHintIdx}` : phasedIdx
-											}
-											initial={{ opacity: 0, y: 6 }}
-											animate={{ opacity: 1, y: 0 }}
-											exit={{ opacity: 0, y: -6 }}
-											transition={{ duration: 0.26 }}
-											className="mb-8 text-center"
-										>
-											<p className="text-[13px] font-black uppercase tracking-[0.12em] text-indigo-800">
-												{phases[phasedIdx].line}
-											</p>
-											<p className="mt-2 px-2 text-[10px] font-medium leading-relaxed text-slate-600">
-												{isWaitingOnModel
-													? activeWaitingHint
-													: phases[phasedIdx].hint}
-											</p>
-										</motion.div>
-									</AnimatePresence>
-
-									<LoadingSnippetTypewriter
-										snippets={loadingSnippets}
-										language={language}
-										label={T.loadingFromPage}
-										cycleFast={isWaitingOnModel}
+									layout
+									initial={{ opacity: 0, y: 8 }}
+									animate={{ opacity: 1, y: 0 }}
+									exit={{ opacity: 0 }}
+									transition={{ duration: 0.22 }}
+									className="relative overflow-hidden rounded-2xl border border-indigo-100/80 bg-white px-5 py-6 shadow-[0_8px_30px_-12px_rgba(79,70,229,0.25)]"
+								>
+									<motion.div
+										aria-hidden
+										className="pointer-events-none absolute inset-y-0 left-0 w-[45%] bg-linear-to-r from-transparent via-indigo-400/25 to-transparent"
+										initial={{ x: "-110%" }}
+										animate={{ x: ["-110%", "320%"] }}
+										transition={{
+											duration: 2.6,
+											repeat: Infinity,
+											ease: "linear",
+										}}
+										style={{ willChange: "transform" }}
 									/>
 
-									<div className="mt-5 flex justify-center">
-										<button
-											type="button"
-											onClick={handleCancelAnalysis}
-											className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-[10px] font-black text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-										>
-											{T.stopAnalysisBtn}
-										</button>
+									<div className="relative z-1">
+										<div className="flex items-center justify-center gap-2.5 pb-6">
+											{phases.map((_, dotIdx) => (
+												<motion.span
+													key={dotIdx}
+													aria-hidden
+													className={`h-1 rounded-full ${
+														dotIdx <= phasedIdx ? "bg-indigo-600" : "bg-slate-200"
+													}`}
+													animate={{
+														width: dotIdx === phasedIdx ? 22 : 6,
+														opacity:
+															dotIdx === phasedIdx
+																? 1
+																: dotIdx < phasedIdx
+																	? 0.7
+																	: 0.35,
+													}}
+													transition={{
+														type: "spring",
+														stiffness: 420,
+														damping: 30,
+													}}
+												/>
+											))}
+										</div>
+
+										<AnimatePresence mode="wait">
+											<motion.div
+												key={
+													isWaitingOnModel ? `wait-${waitingHintIdx}` : phasedIdx
+												}
+												initial={{ opacity: 0, y: 6 }}
+												animate={{ opacity: 1, y: 0 }}
+												exit={{ opacity: 0, y: -6 }}
+												transition={{ duration: 0.26 }}
+												className="mb-8 text-center"
+											>
+												<p className="text-[13px] font-black uppercase tracking-[0.12em] text-indigo-800">
+													{phases[phasedIdx].line}
+												</p>
+												<p className="mt-2 px-2 text-[10px] font-medium leading-relaxed text-slate-600">
+													{isWaitingOnModel
+														? activeWaitingHint
+														: phases[phasedIdx].hint}
+												</p>
+											</motion.div>
+										</AnimatePresence>
+
+										<LoadingSnippetTypewriter
+											snippets={loadingSnippets}
+											language={language}
+											label={T.loadingFromPage}
+											cycleFast={isWaitingOnModel}
+										/>
+
+										<div className="mt-5 flex justify-center">
+											<button
+												type="button"
+												onClick={handleCancelAnalysis}
+												className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-[10px] font-black text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+											>
+												{T.stopAnalysisBtn}
+											</button>
+										</div>
+
+										{payTabs(language).length > 0 ? (
+											<div className="mt-4 text-center text-[11px] leading-relaxed">
+												<p className="font-medium text-slate-500">
+													{DONATION_COPY[language].appealLead}
+												</p>
+												<button
+													type="button"
+													onClick={() => setIsDonationOpen(true)}
+													className="mt-0.5 inline-flex items-center gap-1 rounded-lg px-2 py-1 font-black text-indigo-700 transition-colors hover:bg-indigo-50"
+												>
+													<Coffee size={13} aria-hidden="true" />
+													<span className="underline">
+														{DONATION_COPY[language].appealAction}
+													</span>
+												</button>
+											</div>
+										) : null}
 									</div>
-								</div>
-							</motion.div>
-						)}
+								</motion.div>
+							)}
 
-						{!isProcessing && result ? (
-							<motion.div
-								initial={{ opacity: 0, scale: 0.98 }}
-								animate={{ opacity: 1, scale: 1 }}
-								className="space-y-4 pb-8"
-							>
-								<SummaryResultView
-									readRecommendation={result.readRecommendation}
-									readReason={result.readReason}
-									title={result.title}
-									briefLines={result.briefLines}
-									sourceTabUrl={result.sourceTabUrl}
-									language={language}
-									copyLabel={T.copySummary}
-									copiedLabel={T.copiedSummary}
-								/>
+							{!isProcessing && result ? (
+								<motion.div
+									initial={{ opacity: 0, scale: 0.98 }}
+									animate={{ opacity: 1, scale: 1 }}
+									className="space-y-4 pb-8"
+								>
+									<SavedSummaryBar
+										language={language}
+										savedAt={result.savedAt}
+										isReadLater={resultEntry?.isReadLater ?? false}
+										canRefresh={
+											result.savedAt !== undefined && isResultOnActiveTab
+										}
+										canMarkReadLater={!result.isIncognito}
+										onBack={
+											isOpenedFromHistory
+												? () => setIsHistoryOpen(true)
+												: undefined
+										}
+										onRefresh={handleRefreshSummary}
+										onToggleReadLater={() => {
+											if (resultEntry) handleToggleReadLater(resultEntry);
+										}}
+									/>
+									<SummaryResultView
+										readRecommendation={result.readRecommendation}
+										readReason={result.readReason}
+										title={result.title}
+										briefLines={result.briefLines}
+										sourceTabUrl={result.sourceTabUrl}
+										language={language}
+										copyLabel={T.copySummary}
+										copiedLabel={T.copiedSummary}
+									/>
 
-								<div className="bg-slate-900 text-white rounded-2xl p-4 shadow-xl">
-									<div className="mb-3 border-b border-slate-800 pb-2">
-										<div className="flex items-center justify-between">
-											<span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">
-												{result.stats?.model || "Gemini"}
-											</span>
-											<div className="flex items-center gap-1 text-[9px] font-bold text-slate-500">
-												<Clock size={10} />
-												{T.statsSubtitle}
+									{result.savedAt === undefined ? (
+										<div className="bg-slate-900 text-white rounded-2xl p-4 shadow-xl">
+											<div className="mb-3 border-b border-slate-800 pb-2">
+												<div className="flex items-center justify-between">
+													<span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">
+														{result.stats?.model || "Gemini"}
+													</span>
+													<div className="flex items-center gap-1 text-[9px] font-bold text-slate-500">
+														<Clock size={10} />
+														{T.statsSubtitle}
+													</div>
+												</div>
+											</div>
+											<div className="flex flex-col gap-1 text-[10px] font-bold">
+												<div className="flex justify-between">
+													<span className="text-slate-400">
+														{T.statsSource}:{" "}
+														<strong className="text-slate-200">
+															{T.statsFromTab}
+														</strong>
+													</span>
+													<span className="text-slate-400">
+														{T.statsOutputCap}:{" "}
+														<strong className="text-slate-200">
+															{result.stats?.maxOutputTokensCap ?? "—"} tok
+														</strong>
+													</span>
+												</div>
+												<div className="flex justify-between">
+													<span className="text-slate-400">
+														{T.statsBodyChars}:{" "}
+														<strong className="text-emerald-400">
+															{result.stats?.sentToModelChars ??
+																result.stats?.originalLength}
+															{bodyCharUnit(language)}
+														</strong>
+													</span>
+													<span className="text-slate-400">
+														{T.statsInputEst}:{" "}
+														<strong className="text-slate-200">
+															~
+															{result.stats?.approxInputTokensHint ??
+																Math.ceil(
+																	(result.stats?.originalLength || 0) / 4,
+																)}{" "}
+															tok
+														</strong>
+													</span>
+												</div>
 											</div>
 										</div>
-									</div>
-									<div className="flex flex-col gap-1 text-[10px] font-bold">
-										<div className="flex justify-between">
-											<span className="text-slate-400">
-												{T.statsSource}:{" "}
-												<strong className="text-slate-200">
-													{T.statsFromTab}
-												</strong>
-											</span>
-											<span className="text-slate-400">
-												{T.statsOutputCap}:{" "}
-												<strong className="text-slate-200">
-													{result.stats?.maxOutputTokensCap ?? "—"} tok
-												</strong>
-											</span>
-										</div>
-										<div className="flex justify-between">
-											<span className="text-slate-400">
-												{T.statsBodyChars}:{" "}
-												<strong className="text-emerald-400">
-													{result.stats?.sentToModelChars ??
-														result.stats?.originalLength}
-													{bodyCharUnit(language)}
-												</strong>
-											</span>
-											<span className="text-slate-400">
-												{T.statsInputEst}:{" "}
-												<strong className="text-slate-200">
-													~
-													{result.stats?.approxInputTokensHint ??
-														Math.ceil(
-															(result.stats?.originalLength || 0) / 4,
-														)}{" "}
-													tok
-												</strong>
-											</span>
-										</div>
-									</div>
-								</div>
-							</motion.div>
-						) : (
-							!isProcessing && (
-								<div
-									className={`flex flex-col items-center justify-center px-4 py-20 text-center ${
-										hasApiKey === true && hasCompletedFirstSummary === false
-											? "opacity-60"
-											: "opacity-40"
-									}`}
-								>
-									<FileText size={48} className="text-slate-300 mb-4" />
-									{hasApiKey === false ? (
-										<h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
-											{T.setupEmptyHint}
-										</h3>
-									) : hasCompletedFirstSummary === false ? (
-										<div className="max-w-[17rem] space-y-2">
-											<h3 className="text-sm font-black text-slate-600">
-												{T.readyEmptyTitle}
+									) : null}
+								</motion.div>
+							) : (
+								!isProcessing && (
+									<div
+										className={`flex flex-col items-center justify-center px-4 py-20 text-center ${
+											hasApiKey === true && hasCompletedFirstSummary === false
+												? "opacity-60"
+												: "opacity-40"
+										}`}
+									>
+										<FileText size={48} className="text-slate-300 mb-4" />
+										{hasApiKey === false ? (
+											<h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+												{T.setupEmptyHint}
 											</h3>
-											<p className="text-xs font-medium leading-relaxed text-slate-500">
-												{T.readyEmptyBody}
-											</p>
-											{autoSummarizeEnabled ? (
-												<p className="text-[10px] font-medium leading-relaxed text-indigo-500/90">
-													{T.readyEmptyAutoNote}
+										) : hasCompletedFirstSummary === false ? (
+											<div className="max-w-[17rem] space-y-2">
+												<h3 className="text-sm font-black text-slate-600">
+													{T.readyEmptyTitle}
+												</h3>
+												<p className="text-xs font-medium leading-relaxed text-slate-500">
+													{T.readyEmptyBody}
 												</p>
-											) : null}
-										</div>
-									) : (
-										<p className="max-w-[17rem] text-xs font-medium leading-relaxed text-slate-500">
-											{T.emptyHint}
-										</p>
-									)}
-								</div>
-							)
-						)}
-					</AnimatePresence>
-				</div>
+												{autoSummarizeEnabled ? (
+													<p className="text-[10px] font-medium leading-relaxed text-indigo-500/90">
+														{T.readyEmptyAutoNote}
+													</p>
+												) : null}
+											</div>
+										) : (
+											<p className="max-w-[17rem] text-xs font-medium leading-relaxed text-slate-500">
+												{T.emptyHint}
+											</p>
+										)}
+									</div>
+								)
+							)}
+						</AnimatePresence>
+					</div>
+				)}
 			</main>
 
-			<footer className="shrink-0 border-t border-slate-100 bg-white px-3 py-2 text-center">
+			<footer className="flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-slate-100 bg-white px-3 py-2 text-center">
 				<button
 					type="button"
 					onClick={openLegalPage}
@@ -1121,7 +1416,23 @@ export default function App() {
 				>
 					{LEGAL_LINK[language]}
 				</button>
+				{payTabs(language).length > 0 ? (
+					<button
+						type="button"
+						onClick={() => setIsDonationOpen(true)}
+						className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-indigo-600"
+					>
+						<Coffee size={13} aria-hidden="true" />
+						<span className="underline">{DONATION_COPY[language].entry}</span>
+					</button>
+				) : null}
 			</footer>
+
+			<DonationDialog
+				isOpen={isDonationOpen}
+				language={language}
+				onClose={() => setIsDonationOpen(false)}
+			/>
 
 			<ErrorDialog
 				isOpen={errorDialog.isOpen}

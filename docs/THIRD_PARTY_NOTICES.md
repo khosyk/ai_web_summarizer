@@ -174,3 +174,12 @@ Regenerate: `yarn notices`
 [yallist@3.1.1](https://github.com/isaacs/yallist) - ISC
 [zwitch@2.0.4](https://github.com/wooorm/zwitch) - MIT
 
+---
+
+## Vendored in `public/vendor/`
+
+- qrcodejs@1.0.0
+  - Repository: https://github.com/davidshimjs/qrcodejs
+  - License: MIT (Copyright (c) 2012 davidshimjs)
+  - File: `public/vendor/qrcode.min.js`, unmodified from cdnjs
+

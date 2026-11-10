@@ -74,11 +74,49 @@ function parseRetryAfterMs(message: string): number | null {
 
 const GEMINI_REST = "https://generativelanguage.googleapis.com/v1beta/models";
 
-export const GEMINI_MODEL = "gemini-3.5-flash-lite";
-export const GEMINI_MODEL_FALLBACK = "gemini-3.5-flash";
+export const GEMINI_MODEL = "gemini-flash-lite-latest";
+/** 일시 장애용. `gemini-flash-latest`는 과부하로 수십 초 지연되고 minimal도 미지원이라 고정 */
+export const GEMINI_MODEL_FALLBACK = "gemini-3.6-flash";
+/** 별칭이 거부되거나 응답이 잘릴 때 쓰는 고정 모델 */
+export const GEMINI_MODEL_PINNED = "gemini-3.5-flash-lite";
 
-const PRIMARY_MAX_ATTEMPTS = 3;
-const FALLBACK_MAX_ATTEMPTS = 2;
+const REQUEST_TIMEOUT_MS = 20_000;
+
+export type GeminiModelProfile = {
+	model: string;
+	maxAttempts: number;
+	/** thinking 토큰은 출력 상한에 포함됨 — 미지정 시 flash는 상한을 소진해 응답이 잘림 */
+	thinkingLevel?: "minimal";
+};
+
+const PRIMARY_PROFILE: GeminiModelProfile = {
+	model: GEMINI_MODEL,
+	maxAttempts: 3,
+	thinkingLevel: "minimal",
+};
+const FALLBACK_PROFILE: GeminiModelProfile = {
+	model: GEMINI_MODEL_FALLBACK,
+	maxAttempts: 2,
+	thinkingLevel: "minimal",
+};
+/** 최후 수단 — 새 파라미터가 거부돼도 동작하도록 thinking 설정을 보내지 않음 */
+const PINNED_PROFILE: GeminiModelProfile = {
+	model: GEMINI_MODEL_PINNED,
+	maxAttempts: 2,
+};
+
+export const GEMINI_MODEL_PROFILES = [
+	PRIMARY_PROFILE,
+	FALLBACK_PROFILE,
+	PINNED_PROFILE,
+];
+
+type GeminiRequest = {
+	apiKey: string;
+	systemInstruction: string;
+	userPrompt: string;
+	signal?: AbortSignal;
+};
 
 type GeminiErrBody = {
 	message?: string;
@@ -86,32 +124,35 @@ type GeminiErrBody = {
 	status?: string;
 };
 
-/** lite 실패 시 flash fallback — E11·E10 제외 */
+/** lite 실패 시 flash fallback — E11·E14·E10 제외 */
 function isFallbackEligible(error: WebSummaryError): boolean {
 	if (error.code === "E11" || error.code === "E10") return false;
 	if (error.code === "E12") return true;
 	if (error.code === "E13") {
 		const detail = error.message.toLowerCase();
-		return /high demand|unavailable|overloaded|try again later|503|temporarily/i.test(
+		return /high demand|unavailable|overloaded|try again later|503|temporarily|timeout/i.test(
 			detail,
 		);
 	}
 	return false;
 }
 
-async function generateWithModel(
-	model: string,
-	opts: {
-		apiKey: string;
-		systemInstruction: string;
-		userPrompt: string;
-		maxOutputTokens: number;
-		signal?: AbortSignal;
-	},
-	maxAttempts: number,
+/** 모델이 요청을 거부(없는 모델·미지원 파라미터)했거나 thinking으로 출력 상한을 소진 */
+function isModelRejected(error: WebSummaryError): boolean {
+	if (error.code !== "E13") return false;
+	return (
+		error.httpStatus === 400 ||
+		error.httpStatus === 404 ||
+		error.message.includes("empty_candidate:MAX_TOKENS")
+	);
+}
+
+export async function generateWithProfile(
+	profile: GeminiModelProfile,
+	opts: GeminiRequest,
 ): Promise<{ text: string; model: string }> {
-	const { apiKey, systemInstruction, userPrompt, maxOutputTokens, signal } =
-		opts;
+	const { model, maxAttempts, thinkingLevel } = profile;
+	const { apiKey, systemInstruction, userPrompt, signal } = opts;
 	let lastError: WebSummaryError | undefined;
 	const url = `${GEMINI_REST}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
@@ -121,7 +162,9 @@ async function generateWithModel(
 			const res = await fetch(url, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				signal,
+				signal: signal
+					? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+					: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 				body: JSON.stringify({
 					systemInstruction: {
 						parts: [{ text: systemInstruction }],
@@ -133,8 +176,8 @@ async function generateWithModel(
 						},
 					],
 					generationConfig: {
-						maxOutputTokens,
-						temperature: 0.35,
+						maxOutputTokens: MAX_OUTPUT_TOKENS,
+						...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}),
 						responseMimeType: "application/json",
 						responseSchema: GEMINI_SUMMARY_RESPONSE_SCHEMA,
 					},
@@ -165,7 +208,10 @@ async function generateWithModel(
 
 			const text = extractGeminiText(data);
 			if (text) {
-				return { text, model };
+				// 별칭으로 호출해도 실제 처리한 모델을 표시
+				const modelVersion =
+					typeof data.modelVersion === "string" ? data.modelVersion : "";
+				return { text, model: modelVersion || model };
 			}
 
 			const reason = (
@@ -185,9 +231,10 @@ async function generateWithModel(
 					? e
 					: new DOMException("Aborted", "AbortError");
 			}
+			const isTimeout = e instanceof DOMException && e.name === "TimeoutError";
 			lastError = new WebSummaryError(
 				"E13",
-				e instanceof Error ? e.message : String(e),
+				isTimeout ? "timeout" : e instanceof Error ? e.message : String(e),
 			);
 			break;
 		}
@@ -196,26 +243,28 @@ async function generateWithModel(
 	throw lastError ?? new WebSummaryError("E13", "request_failed");
 }
 
-export async function summarizeWithGemini(opts: {
-	apiKey: string;
-	systemInstruction: string;
-	userPrompt: string;
-	maxOutputTokens: number;
-	signal?: AbortSignal;
-}): Promise<{ text: string; model: string }> {
+async function generateWithPinnedOnRejection(
+	profile: GeminiModelProfile,
+	opts: GeminiRequest,
+): Promise<{ text: string; model: string }> {
 	try {
-		return await generateWithModel(
-			GEMINI_MODEL,
-			opts,
-			PRIMARY_MAX_ATTEMPTS,
-		);
+		return await generateWithProfile(profile, opts);
+	} catch (error) {
+		if (error instanceof WebSummaryError && isModelRejected(error)) {
+			return generateWithProfile(PINNED_PROFILE, opts);
+		}
+		throw error;
+	}
+}
+
+export async function summarizeWithGemini(
+	opts: GeminiRequest,
+): Promise<{ text: string; model: string }> {
+	try {
+		return await generateWithPinnedOnRejection(PRIMARY_PROFILE, opts);
 	} catch (error) {
 		if (error instanceof WebSummaryError && isFallbackEligible(error)) {
-			return generateWithModel(
-				GEMINI_MODEL_FALLBACK,
-				opts,
-				FALLBACK_MAX_ATTEMPTS,
-			);
+			return generateWithPinnedOnRejection(FALLBACK_PROFILE, opts);
 		}
 		throw error;
 	}
@@ -280,13 +329,12 @@ export async function summarizeArticle(input: {
 
 	for (let attempt = 0; attempt < SUMMARY_PARSE_MAX_ATTEMPTS; attempt++) {
 		throwIfAborted(signal);
-		const result = await summarizeWithGemini({
-			apiKey,
-			systemInstruction,
-			userPrompt,
-			maxOutputTokens: MAX_OUTPUT_TOKENS,
-			signal,
-		});
+		const request = { apiKey, systemInstruction, userPrompt, signal };
+		// 별칭 모델이 바뀌어 JSON이 계속 깨질 때를 대비해 마지막 시도는 고정 모델로
+		const result =
+			attempt === SUMMARY_PARSE_MAX_ATTEMPTS - 1
+				? await generateWithProfile(PINNED_PROFILE, request)
+				: await summarizeWithGemini(request);
 		model = result.model;
 
 		try {

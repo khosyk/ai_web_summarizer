@@ -29,12 +29,14 @@
 - **Auto ON/OFF** — 탭 진입·전환 후 **3초 dwell** → 자동 요약 (기본 OFF, `chrome.storage.local`)
 - **Auto 제외 사이트** — 도메인별 Auto 차단 (Settings 목록·사이드패널 「이 사이트에서 Auto 끄기」)
 - **요약 중지** — 로딩 카드에서 진행 중 API 취소 (`AbortController`)
+- **요약 기록·나중에 읽기** — 결과를 이 브라우저에 최근 200개까지 저장, 24시간 안의 같은 글은 API 호출 없이 재사용, 검색·필터·개별/전체 삭제·자동 저장 끄기(새 설치는 켜짐, 이전 버전에서 업데이트하면 꺼짐), 시크릿 창 제외
 - **UI 언어** — English / Korean / Chinese (요약 출력 언어 연동)
 - **Welcome** — 설치 시 온보딩, API 키 스크린샷 가이드
 - **Settings** — Gemini API 키 저장, Auto 제외 도메인, 「키를 찾는 데 도움이 필요하신가요?」→ welcome
+- **개발자에게 커피 한 잔** — 사이드패널 하단, 요약 대기 화면, 설치 가이드 알림에서 여는 선택 후원 창 (카카오페이·PayPal, 설정과 운영은 [`docs/DONATION.md`](docs/DONATION.md))
 - **법률·개인정보** — 사이드패널·Welcome·Settings에서 `legal.html` 링크 (EN/KO/中文)
 
-`chrome.storage.local`: API 키, UI 언어, Auto 토글(기본 OFF), **Auto 제외 도메인 목록**, 첫 요약 완료 여부(온보딩용).
+`chrome.storage.local`: API 키, UI 언어, Auto 토글(기본 OFF), **Auto 제외 도메인 목록**, 첫 요약 완료 여부(온보딩용), 후원 알림 숨김 시각, **요약 기록**(페이지 주소 포함, 본문 제외).
 
 ### 요약 결과
 
@@ -55,7 +57,7 @@
 [사이드패널] App.tsx
     articleTokenDiet → summarizeArticle()
          ↓ fetch (매 요청 1 user turn, 세션 누적 없음)
-[Gemini] gemini-3.5-flash-lite (+ 조건부 flash fallback)
+[Gemini] gemini-flash-lite-latest (+ 조건부 고정 모델 fallback)
          ↓ application/json + responseSchema
     parseStructuredSummary → SummaryResultView
 ```
@@ -80,14 +82,17 @@
 // geminiClient.ts
 MAX_INPUT_CHARS = 8000; // diet 적용 후 상한
 MAX_OUTPUT_TOKENS = 384; // 짧은 JSON (read/skip + 3 lines)
-GEMINI_MODEL = "gemini-3.5-flash-lite";
-GEMINI_MODEL_FALLBACK = "gemini-3.5-flash"; // E12·일부 E13만
-PRIMARY_MAX_ATTEMPTS = 3; // lite 호출 (E12 retry-after 포함)
-FALLBACK_MAX_ATTEMPTS = 2; // flash 호출
-SUMMARY_PARSE_MAX_ATTEMPTS = 3; // E10(JSON) 시 동일 프롬프트 재호출
+GEMINI_MODEL = "gemini-flash-lite-latest"; // thinking minimal, 3회 (E12 retry-after 포함)
+GEMINI_MODEL_FALLBACK = "gemini-3.6-flash"; // E12·일부 E13, thinking minimal, 2회
+GEMINI_MODEL_PINNED = "gemini-3.5-flash-lite"; // 모델 거부·응답 잘림, thinking 미지정, 2회
+SUMMARY_PARSE_MAX_ATTEMPTS = 3; // E10(JSON) 시 재호출, 마지막은 고정 모델
+REQUEST_TIMEOUT_MS = 20_000; // 요청당 제한 시간, 초과 시 flash로 전환
 ```
 
-- **모델 fallback:** E11(키 거부)·E10(JSON)에는 flash로 넘기지 않음. rate limit(E12)과 일시 장애(E13)만 flash 시도.
+- **모델 추종:** `latest` 별칭을 써서 새 모델이 나와도 재배포하지 않음. 실제 처리 모델은 응답의 `modelVersion`을 표시.
+- **모델 fallback:** E11(키 거부)·E14(크레딧 소진)·E10(JSON)에는 flash로 넘기지 않음. rate limit(E12)과 일시 장애·시간 초과(E13)만 flash 시도. HTTP 400·404와 `MAX_TOKENS` 빈 응답은 고정 모델로 재시도.
+- **주간 점검:** [`model-smoke.yml`](.github/workflows/model-smoke.yml)이 세 모델을 실제 호출. 고정 모델은 이 점검이 실패하거나 모델 종료가 공지될 때만 변경.
+- **E14:** HTTP 402(선불 크레딧 소진)는 재시도와 모델 전환 없이 바로 안내.
 - **E12:** `retry in Ns` 메시지가 있으면 최대 120초까지 대기 후 같은 모델 재시도.
 - **Auto 요약:** `AUTO_SUMMARIZE_DWELL_MS = 3000`. `tabs.onActivated` / `onUpdated`로 스케줄. 같은 `tabUrl` + `summaryLanguage` 결과가 있으면 스킵. **제외 도메인**(`autoSummarizeBlockedHosts`)이면 스킵.
 - **Auto ON UI:** 요약 버튼 숨김·Auto 버튼 full width·색으로 ON/OFF 표시·compliance 노트·「이 사이트에서 Auto 끄기」.
